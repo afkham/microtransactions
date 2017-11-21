@@ -2,6 +2,7 @@ package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
 import ballerina.util;
+import ballerina.log;
 
 public const string TRANSACTION_CONTEXT_VERSION = "1.0";
 
@@ -12,26 +13,31 @@ struct TransactionContext {
     string registerAtURL;
 }
 
+struct Protocol {
+    string name;
+    string url;
+}
+
 struct RegistrationRequest {
     string transactionId;
-    string protocol;
-    string participantProtocolAt;
-
+    Protocol[] participantProtocols;
 }
 
 struct RegistrationResponse {
     string transactionId;
-    string coordinatorProtocolAt;
-
+    Protocol[] coordinatorProtocols;
 }
 
+map transactionContexts = {};
+
 @http:configuration {
-    basePath:"/"
+    basePath:"/",
+    port:9999
 }
 service<http> coordinator {
 
     @http:resourceConfig {
-        path:"/{coordinationType}"
+        path:"/createContext/{coordinationType}"
     }
     resource createContext(http:Request req, http:Response res, string coordinationType) {
         //create-context(in: Name-of-Coordination-Type,
@@ -43,12 +49,17 @@ service<http> coordinator {
         //Invalid-Coordination-Type
         string tid = util:uuid();
         TransactionContext context =
-            {transactionId: tid, coordinationType:coordinationType, registerAtURL:"http://localhost:9090/register"};
+            {transactionId: tid, coordinationType:coordinationType, registerAtURL:"http://localhost:9999/register"};
+        transactionContexts[tid] = context;
         var resPayload, _ = <json>context;
         res.setJsonPayload(resPayload);
         res.send();
+        //TODO: handle invalid coordination type
     }
 
+    @http:resourceConfig {
+        path:"register"
+    }
     resource register(http:Request req, http:Response res) {
         //register(in: Micro-Transaction-Registration,
         //out: Micro-Transaction-Coordination?,
@@ -76,6 +87,14 @@ service<http> coordinator {
         //If the registering participant specified an unknown micro-transaction identifier, the following fault is returned:
 
         // Micro-Transaction-Unknown
+
+        var regRequest, e = <RegistrationRequest> req.getJsonPayload();
+        if (e == null) {
+            print("X");
+        } else {
+            log:printErrorCause("Invalid registration request", (error) e);
+        }
+        res.send();
     }
 
     resource commitTransaction(http:Request req, http:Response res) {
