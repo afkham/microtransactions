@@ -2,9 +2,8 @@ package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
 import ballerina.util;
-import ballerina.log;
 
-public const string TRANSACTION_CONTEXT_VERSION = "1.0";
+const string TRANSACTION_CONTEXT_VERSION = "1.0";
 
 enum CoordinationType {
     TWO_PHASE_COMMIT
@@ -15,10 +14,23 @@ enum Protocols {
 }
 
 const string TWO_PHASE_COMMIT = "2pc";
-map coordTypeToProtocolsMap = {TWO_PHASE_COMMIT:[Protocols.COMPLETION, Protocols.DURABLE, Protocols.VOLATILE]};
 
+string[] coordinationTypes = [TWO_PHASE_COMMIT];
+
+map coordinationTypeToProtocolsMap = getCoordinationTypeToProtocolsMap();
+function getCoordinationTypeToProtocolsMap() returns (map m) {
+    m = {};
+    string[] values = ["completion", "durable", "volatile"];
+    m[TWO_PHASE_COMMIT] = values;
+    return;
+}
 
 map transactions = {};
+
+struct Coordination {
+    string coordinationType = "2pc";
+    map participants;
+}
 
 struct Participant {
     string participantId;
@@ -59,7 +71,36 @@ struct RequestError {
     string errorMessage;
 }
 
-map transactionContexts = {};
+transformer <json jsonReq, CreateTransactionContextRequest structReq> toStruct() {
+    structReq.coordinationType = validateStrings(jsonReq["coordinationType"]);
+    structReq.participantId = validateStrings(jsonReq["participantId"]);
+    structReq.participantProtocols = validateProtocols(jsonReq["participantProtocols"]);
+}
+
+function validateStrings (json j) returns (string) {
+    if (j == null) {
+        error e = {msg:"Invalid data"};
+        throw e;
+    }
+    var result, _ = (string)j;
+    return result;
+}
+
+function validateProtocols (json j) returns (Protocol[]) {
+    if (j == null) {
+        error e = {msg:"Invalid data"};
+        throw e;
+    }
+    Protocol[] protocols = [];
+    int i = 0;
+    while (i < lengthof j) {
+        json protocolJson = j[i];
+        Protocol protocol = {name:protocolJson["name"].toString(), url:protocolJson["url"].toString()};
+        protocols[i] = protocol;
+        i = i + 1;
+    }
+    return protocols;
+}
 
 @http:configuration {
     basePath:"/",
@@ -71,50 +112,75 @@ service<http> coordinator {
         path:"/createContext"
     }
     resource createContext (http:Request req, http:Response res) {
-        //create-context(in: Name-of-Coordination-Type,
-        //out: Micro-Transaction-Context?,
-        //fault: Invalid-Coordination-Type? )
-
-        //If the name of the coordination type is unknown to the coordinator, the following fault is returned:
-        //
-        //Invalid-Coordination-Type
-        var ccReq, e = <CreateTransactionContextRequest>req.getJsonPayload();
-        string coordinationType = ccReq.coordinationType;
-        if (coordinationType != TWO_PHASE_COMMIT) { // Only 2PC is supported at the moment
-            res.setStatusCode(422);
-            RequestError err = {errorMessage:"Invalid-Coordination-Type" + coordinationType};
-            var resPayload, _ = <json>err;
-            res.setJsonPayload(resPayload);
-        } else {
-
-            // Save the participant
-            if (e == null) {
+        try {
+            CreateTransactionContextRequest ccReq = <CreateTransactionContextRequest, toStruct()>req.getJsonPayload();
+            string coordinationType = ccReq.coordinationType;
+            if (!isValidCoordinationType(coordinationType)) {
+                res.setStatusCode(422);
+                RequestError err = {errorMessage:"Invalid-Coordination-Type:" + coordinationType};
+                var resPayload, _ = <json>err;
+                res.setJsonPayload(resPayload);
+            } else {
                 CreateTransactionContextRequest createContextReq = (CreateTransactionContextRequest)ccReq;
                 Participant participant = {participantId:createContextReq.participantId,
                                               participantProtocols:createContextReq.participantProtocols,
                                               isInitiator:true};
-                map transactionParticipants = {};
+                Coordination coordination = {coordinationType:coordinationType};
+                coordination.participants = {};
+
                 // Add the initiator, who is also the first participant
-                transactionParticipants[participant.participantId] = participant;
+                coordination.participants[participant.participantId] = participant;
 
                 string tid = util:uuid();
 
                 // Add the map of participants for the transaction with ID tid to the transactions map
-                transactions[tid] = transactionParticipants;
-
+                transactions[tid] = coordination;
                 TransactionContext context = {transactionId:tid,
                                                  coordinationType:coordinationType,
                                                  registerAtURL:"http://localhost:9999/register"};
-                transactionContexts[tid] = context;
                 var resPayload, _ = <json>context;
                 res.setJsonPayload(resPayload);
-            } else {
-                res.setStatusCode(400);
-                RequestError err = {errorMessage:"Bad Request " + coordinationType};
-                var resPayload, _ = <json>err;
-                res.setJsonPayload(resPayload);
             }
+        } catch (error e) {
+            res.setStatusCode(400);
+            RequestError err = {errorMessage:"Bad Request"};
+            var resPayload, _ = <json>err;
+            res.setJsonPayload(resPayload);
         }
+        //CreateTransactionContextRequest ccReq = <CreateTransactionContextRequest>req.getJsonPayload();
+        //if (e != null) {
+        //    res.setStatusCode(400);
+        //    RequestError err = {errorMessage:"Bad Request"};
+        //    var resPayload, _ = <json>err;
+        //    res.setJsonPayload(resPayload);
+        //} else {
+        //    string coordinationType = ccReq.coordinationType;
+        //    if (!isValidCoordinationType(coordinationType)) {
+        //        res.setStatusCode(422);
+        //        RequestError err = {errorMessage:"Invalid-Coordination-Type:" + coordinationType};
+        //        var resPayload, _ = <json>err;
+        //        res.setJsonPayload(resPayload);
+        //    } else {
+        //        CreateTransactionContextRequest createContextReq = (CreateTransactionContextRequest)ccReq;
+        //        Participant participant = {participantId:createContextReq.participantId,
+        //                                      participantProtocols:createContextReq.participantProtocols,
+        //                                      isInitiator:true};
+        //        map transactionParticipants = {};
+        //        // Add the initiator, who is also the first participant
+        //        transactionParticipants[participant.participantId] = participant;
+        //
+        //        string tid = util:uuid();
+        //
+        //        // Add the map of participants for the transaction with ID tid to the transactions map
+        //        transactions[tid] = transactionParticipants;
+        //        TransactionContext context = {transactionId:tid,
+        //                                         coordinationType:coordinationType,
+        //                                         registerAtURL:"http://localhost:9999/register"};
+        //        transactionContexts[tid] = context;
+        //        var resPayload, _ = <json>context;
+        //        res.setJsonPayload(resPayload);
+        //    }
+        //}
         res.send();
     }
 
@@ -150,11 +216,31 @@ service<http> coordinator {
         // Micro-Transaction-Unknown
 
         //TODO: impl
-        var regRequest, e = <RegistrationRequest>req.getJsonPayload();
-        if (e == null) {
-            print("X");
+        var registrationReq, e = <RegistrationRequest>req.getJsonPayload();
+        if (e != null) {
+            res.setStatusCode(400);
+            RequestError err = {errorMessage:"Bad Request"};
+            var resPayload, _ = <json>err;
+            res.setJsonPayload(resPayload);
         } else {
-            log:printErrorCause("Invalid registration request", (error)e);
+            string participantId = registrationReq.participantId;
+            string transactionId = registrationReq.transactionId;
+            var coordination, _ = (Coordination)transactions[transactionId];
+
+            if (coordination == null) { //TODO: replace this with transactions.hasKey(transactionId), Transaction-Unknown
+                respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + transactionId);
+            } else if (isRegisteredParticipant(participantId, coordination.participants)) { // Already-Registered
+                respondToBadRequest(res,
+                                    "Already-Registered. TID:" + transactionId + ",paticipant ID:" + participantId);
+            } else if (!protocolCompatible(coordination.coordinationType,
+                                           registrationReq.participantProtocols)) { // Invalid-Protocol
+                respondToBadRequest(res, "Invalid-Protocol. TID:" + transactionId + ",paticipant ID:" + participantId);
+            } else {
+                Participant participant = {participantId:participantId,
+                                              participantProtocols:registrationReq.participantProtocols,
+                                              isInitiator:false};
+                coordination.participants[participantId] = participant;
+            }
         }
         res.send();
     }
@@ -200,6 +286,57 @@ service<http> coordinator {
     resource replay (http:Request req, http:Response res) {
 
     }
-
-
 }
+
+function isRegisteredParticipant (string participantId, map participants) returns (boolean) {
+    return participants[participantId] != null;
+}
+
+function isValidCoordinationType (string coordinationType) returns (boolean) {
+    int i = 0;
+    int length = lengthof coordinationTypes;
+    while (i < length) {
+        if (coordinationType == coordinationTypes[i]) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+function protocolCompatible (string coordinationType,
+                             Protocol[] participantProtocols) returns (boolean participantProtocolIsValid) {
+    var validProtocols, e = (string[])coordinationTypeToProtocolsMap[coordinationType];
+    println(e);
+    println(coordinationType);
+    println(coordinationTypeToProtocolsMap);
+    println(validProtocols);
+
+    int i = 0;
+    while (i < lengthof participantProtocols) {
+        int j = 0;
+        while (j < lengthof validProtocols) {
+            if (participantProtocols[i].name == validProtocols[j]) {
+                participantProtocolIsValid = true;
+                break;
+            } else {
+                participantProtocolIsValid = false;
+            }
+            j = j + 1;
+        }
+        if (!participantProtocolIsValid) {
+            break;
+        }
+        i = i + 1;
+    }
+    return participantProtocolIsValid;
+}
+
+function respondToBadRequest (http:Response res, string msg) {
+    res.setStatusCode(400);
+    RequestError err = {errorMessage:msg};
+    var resPayload, _ = <json>err;
+    res.setJsonPayload(resPayload);
+}
+
+
