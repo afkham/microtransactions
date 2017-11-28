@@ -27,8 +27,13 @@ function getCoordinationTypeToProtocolsMap() returns (map m) {
 
 map transactions = {};
 
-struct Coordination {
+enum TransactionState {
+    PREPARED, COMMITTED, ABORTED
+}
+
+struct Transaction {
     string coordinationType = "2pc";
+    TransactionState state;
     map participants;
 }
 
@@ -125,7 +130,7 @@ service<http> coordinator {
                 Participant participant = {participantId:createContextReq.participantId,
                                               participantProtocols:createContextReq.participantProtocols,
                                               isInitiator:true};
-                Coordination coordination = {coordinationType:coordinationType};
+                Transaction txn = {coordinationType:coordinationType};
                 coordination.participants = {};
 
                 // Add the initiator, who is also the first participant
@@ -134,7 +139,7 @@ service<http> coordinator {
                 string tid = util:uuid();
 
                 // Add the map of participants for the transaction with ID tid to the transactions map
-                transactions[tid] = coordination;
+                transactions[tid] = txn;
                 TransactionContext context = {transactionId:tid,
                                                  coordinationType:coordinationType,
                                                  registerAtURL:"http://localhost:9999/register"};
@@ -181,7 +186,7 @@ service<http> coordinator {
         //        res.setJsonPayload(resPayload);
         //    }
         //}
-        res.send();
+        _ = res.send();
     }
 
     @http:resourceConfig {
@@ -225,9 +230,9 @@ service<http> coordinator {
         } else {
             string participantId = registrationReq.participantId;
             string transactionId = registrationReq.transactionId;
-            var coordination, _ = (Coordination)transactions[transactionId];
+            var coordination, _ = (Transaction)transactions[transactionId];
 
-            if (coordination == null) { //TODO: replace this with transactions.hasKey(transactionId), Transaction-Unknown
+            if (coordination == null) {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + transactionId);
             } else if (isRegisteredParticipant(participantId, coordination.participants)) { // Already-Registered
                 respondToBadRequest(res,
@@ -241,8 +246,9 @@ service<http> coordinator {
                                               isInitiator:false};
                 coordination.participants[participantId] = participant;
             }
+            //TODO: Need to handle the  Cannot-Register error case
         }
-        res.send();
+        _ = res.send();
     }
 
     resource commitTransaction (http:Request req, http:Response res) {
