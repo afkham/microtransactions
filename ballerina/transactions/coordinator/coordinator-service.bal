@@ -250,14 +250,6 @@ service<http> coordinator {
 
     }
 
-    resource prepare (http:Request req, http:Response res) {
-
-    }
-
-    resource notify (http:Request req, http:Response res) {
-
-    }
-
     resource replay (http:Request req, http:Response res) {
 
     }
