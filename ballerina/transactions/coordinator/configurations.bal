@@ -22,4 +22,3 @@ function getCoordinatorPort () returns (int port) {
     }
     return;
 }
-
