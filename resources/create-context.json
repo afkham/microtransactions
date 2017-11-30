@@ -1,0 +1,14 @@
+{
+  "participantId": "68c2823c2c09462d9ad5ed32c55ad858",
+  "coordinationType": "2pc",
+  "participantProtocols": [{
+    "name": "completion",
+    "url": "http://localhost:9191/completion"
+  }, {
+    "name": "durable",
+    "url": "http://localhost:9191/durable"
+  }, {
+    "name": "volatile",
+    "url": "http://localhost:9191/volatile"
+  }]
+}

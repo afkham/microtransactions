@@ -1,0 +1,18 @@
+{
+  "transactionId": "92d57da128bf46efb4f36649433e7ab5",
+  "participantId": "pid2",
+  "participantProtocols": [
+    {
+      "name": "volatile",
+      "url": "http://localhost:8080/protocol/volatile"
+    },
+    {
+      "name": "completion",
+      "url": "http://localhost:8080/protocol/completion"
+    },
+    {
+      "name": "durableXX",
+      "url": "http://localhost:8080/protocol/durable"
+    }
+  ]
+}

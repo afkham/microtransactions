@@ -3,7 +3,6 @@ package ballerina.transactions.coordinator;
 import ballerina.net.http;
 import ballerina.util;
 
-const string TRANSACTION_CONTEXT_VERSION = "1.0";
 
 enum CoordinationType {
     TWO_PHASE_COMMIT
@@ -18,7 +17,7 @@ const string TWO_PHASE_COMMIT = "2pc";
 string[] coordinationTypes = [TWO_PHASE_COMMIT];
 
 map coordinationTypeToProtocolsMap = getCoordinationTypeToProtocolsMap();
-function getCoordinationTypeToProtocolsMap() returns (map m) {
+function getCoordinationTypeToProtocolsMap () returns (map m) {
     m = {};
     string[] values = ["completion", "durable", "volatile"];
     m[TWO_PHASE_COMMIT] = values;
@@ -26,55 +25,6 @@ function getCoordinationTypeToProtocolsMap() returns (map m) {
 }
 
 map transactions = {};
-
-enum TransactionState {
-    PREPARED, COMMITTED, ABORTED
-}
-
-struct Transaction {
-    string coordinationType = "2pc";
-    TransactionState state;
-    map participants;
-}
-
-struct Participant {
-    string participantId;
-    Protocol[] participantProtocols;
-    boolean isInitiator;
-}
-
-struct CreateTransactionContextRequest {
-    string participantId;
-    string coordinationType;
-    Protocol[] participantProtocols;
-}
-
-struct TransactionContext {
-    string contextVersion = "1.0";
-    string transactionId;
-    string coordinationType;
-    string registerAtURL;
-}
-
-struct Protocol {
-    string name;
-    string url;
-}
-
-struct RegistrationRequest {
-    string transactionId;
-    string participantId;
-    Protocol[] participantProtocols;
-}
-
-struct RegistrationResponse {
-    string transactionId;
-    Protocol[] coordinatorProtocols;
-}
-
-struct RequestError {
-    string errorMessage;
-}
 
 transformer <json jsonReq, CreateTransactionContextRequest structReq> toStruct() {
     structReq.coordinationType = validateStrings(jsonReq["coordinationType"]);
@@ -109,7 +59,8 @@ function validateProtocols (json j) returns (Protocol[]) {
 
 @http:configuration {
     basePath:"/",
-    port:9999
+    host:coordinatorHost,
+    port:coordinatorPort
 }
 service<http> coordinator {
 
@@ -131,10 +82,10 @@ service<http> coordinator {
                                               participantProtocols:createContextReq.participantProtocols,
                                               isInitiator:true};
                 Transaction txn = {coordinationType:coordinationType};
-                coordination.participants = {};
+                txn.participants = {};
 
                 // Add the initiator, who is also the first participant
-                coordination.participants[participant.participantId] = participant;
+                txn.participants[participant.participantId] = participant;
 
                 string tid = util:uuid();
 
@@ -142,7 +93,7 @@ service<http> coordinator {
                 transactions[tid] = txn;
                 TransactionContext context = {transactionId:tid,
                                                  coordinationType:coordinationType,
-                                                 registerAtURL:"http://localhost:9999/register"};
+                                                 registerAtURL:"http://" + coordinatorHost + ":" + coordinatorPort + "/register"};
                 var resPayload, _ = <json>context;
                 res.setJsonPayload(resPayload);
             }
@@ -180,7 +131,7 @@ service<http> coordinator {
         //        transactions[tid] = transactionParticipants;
         //        TransactionContext context = {transactionId:tid,
         //                                         coordinationType:coordinationType,
-        //                                         registerAtURL:"http://localhost:9999/register"};
+        //                                         registerAtURL:"http://"+ coordinatorHost + ":" + coordinatorPort + "/register"};
         //        transactionContexts[tid] = context;
         //        var resPayload, _ = <json>context;
         //        res.setJsonPayload(resPayload);
@@ -220,7 +171,6 @@ service<http> coordinator {
 
         // Micro-Transaction-Unknown
 
-        //TODO: impl
         var registrationReq, e = <RegistrationRequest>req.getJsonPayload();
         if (e != null) {
             res.setStatusCode(400);
@@ -229,22 +179,41 @@ service<http> coordinator {
             res.setJsonPayload(resPayload);
         } else {
             string participantId = registrationReq.participantId;
-            string transactionId = registrationReq.transactionId;
-            var coordination, _ = (Transaction)transactions[transactionId];
+            string txnId = registrationReq.transactionId;
+            var coordination, _ = (Transaction)transactions[txnId];
 
             if (coordination == null) {
-                respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + transactionId);
+                respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
             } else if (isRegisteredParticipant(participantId, coordination.participants)) { // Already-Registered
                 respondToBadRequest(res,
-                                    "Already-Registered. TID:" + transactionId + ",paticipant ID:" + participantId);
+                                    "Already-Registered. TID:" + txnId + ",participant ID:" + participantId);
             } else if (!protocolCompatible(coordination.coordinationType,
                                            registrationReq.participantProtocols)) { // Invalid-Protocol
-                respondToBadRequest(res, "Invalid-Protocol. TID:" + transactionId + ",paticipant ID:" + participantId);
+                respondToBadRequest(res, "Invalid-Protocol. TID:" + txnId + ",participant ID:" + participantId);
             } else {
                 Participant participant = {participantId:participantId,
                                               participantProtocols:registrationReq.participantProtocols,
                                               isInitiator:false};
                 coordination.participants[participantId] = participant;
+
+                // Send the response
+                Protocol[] participantProtocols = registrationReq.participantProtocols;
+                Protocol[] coordinatorProtocols = [];
+                int i = 0;
+                while (i < lengthof participantProtocols) {
+                    Protocol participantProtocol = participantProtocols[i];
+                    Protocol coordinatorProtocol =
+                    {name:participantProtocol.name,
+                        url:"http://" + coordinatorHost + ":" + coordinatorPort + "/protocol/" + participantProtocol.name};
+
+                    coordinatorProtocols[i] = coordinatorProtocol;
+                    i = i + 1;
+                }
+
+                RegistrationResponse registrationRes = {transactionId:txnId,
+                                                           coordinatorProtocols:coordinatorProtocols};
+                var resPayload, _ = <json>registrationRes;
+                res.setJsonPayload(resPayload);
             }
             //TODO: Need to handle the  Cannot-Register error case
         }
