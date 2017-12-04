@@ -63,6 +63,9 @@ function validateProtocols (json j) returns (Protocol[]) {
 }
 service<http> coordinator {
 
+    endpoint<http:HttpClient> participantEP {
+    }
+
     @http:resourceConfig {
         path:"/createContext"
     }
@@ -243,6 +246,19 @@ service<http> coordinator {
         // (see section 2.2.6), the following fault will be returned:
 
         // Hazard-Outcome
+
+        // TODO: impl.
+        // Prepare phase & commit phase
+        // First get all the volatile participants and call prepare on them
+        // If all volatile participants voted YES, get all the durable participants and call prepare on them
+        // If all durable participants voted YES (PREPARED or READONLY), next call notify(commit) on all
+        // (durable & volatile) participants
+        // and return committed to the initiator
+        // If some durable participants voted NO, next call notify(abort) on all durable participants
+        // and return aborted to the initiator
+
+        http:HttpClient participantClient = create http:HttpClient("https://postman-echo.com", {});
+        bind participantClient with participantEP;
     }
 
     resource abortTransaction (http:Request req, http:Response res) {
