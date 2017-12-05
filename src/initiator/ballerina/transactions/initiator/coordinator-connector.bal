@@ -21,8 +21,21 @@ public connector TransactionClient () {
         return;
     }
 
-    action commitTransaction(){
-
+    action commitTransaction(CommitRequest commitReq) returns (json jsonRes, error err){
+        endpoint<http:HttpClient> coordinatorEP {
+            create http:HttpClient("http://localhost:8080/2pc/commit", {});
+        }
+        var j, _  = <json> commitReq;
+        http:Request req = {};
+        req.setJsonPayload(j);
+        var res, e = coordinatorEP.post("", req);
+        if(e == null) {
+            http:Response r = (http:Response) res;
+            jsonRes = r.getJsonPayload();
+        } else {
+            err = (error) e;
+        }
+        return;
     }
 
     action abortTransaction(){

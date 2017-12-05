@@ -8,7 +8,7 @@ public function main (string[] args) {
     json txnContext = beginTransaction();
 
     callBusinessService(txnContext);
-    commitTransaction();
+    _ = commitTransaction(txnContext);
     sleep(1000);
 }
 
@@ -24,12 +24,20 @@ struct BizRequest {
     float price;
 }
 
+struct CommitRequest {
+    string transactionId;
+}
+
+struct CommitResponse {
+    string message;
+}
+
 function beginTransaction () returns (json) {
-    endpoint<TransactionClient> participantEP {
+    endpoint<TransactionClient> coordinatorEP {
         create TransactionClient();
     }
     CreateTransactionContextRequest ctcReq = {participantId:util:uuid(), coordinationType:"2pc"};
-    var j, e = participantEP.createContext(ctcReq);
+    var j, e = coordinatorEP.createContext(ctcReq);
     println(e);
     println(j);
     return j;
@@ -48,8 +56,16 @@ function callBusinessService (json txnContext) {
     println(j);
 }
 
-function commitTransaction () {
-
+function commitTransaction (json txnContext) returns (json) {
+    endpoint<TransactionClient> coordinatorEP {
+        create TransactionClient();
+    }
+    var txnId, _ = (string) txnContext["transactionId"];
+    CommitRequest commitReq = {transactionId:txnId};
+    var j, e = coordinatorEP.commitTransaction(commitReq);
+    println(e);
+    println(j);
+    return j;
 }
 
 function abortTransaction () {
