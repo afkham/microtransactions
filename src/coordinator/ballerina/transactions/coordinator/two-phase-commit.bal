@@ -11,7 +11,7 @@ enum Protocols {
     COMPLETION, DURABLE, VOLATILE
 }
 
-function twoPhaseCommit (map participants) returns (boolean successful) {
+function twoPhaseCommit (string transactionId, map participants) returns (boolean successful) {
 
     var p, _ = (Participant[])participants.values();
 
@@ -34,20 +34,25 @@ function twoPhaseCommit (map participants) returns (boolean successful) {
         i = i + 1;
     }
     // Prepare phase & commit phase
-    // First get all the volatile participants and call prepare on them
-    boolean voteSuccess = prepare(volatileEndpoints);
+    // First call prepare on all volatile participants
+    boolean voteSuccess = prepare(transactionId, volatileEndpoints);
     if(voteSuccess) {
-        voteSuccess = prepare(durableEndpoints);
+        // Next call prepare on all durable participants
+        voteSuccess = prepare(transactionId, durableEndpoints);
         if(voteSuccess) {
-
+            notify(transactionId, durableEndpoints, "commit");
+            notify(transactionId, volatileEndpoints, "commit");
+            successful = true;
         } else {
-
+            notify(transactionId, durableEndpoints, "abort");
+            notify(transactionId, volatileEndpoints, "abort");
+            successful = false;
         }
     } else {
-
+        successful = false;
     }
 
-    return false;
+    return successful;
 
 
     // If all volatile participants voted YES, get all the durable participants and call prepare on them
@@ -58,23 +63,43 @@ function twoPhaseCommit (map participants) returns (boolean successful) {
     // and return aborted to the initiator
 }
 
-function prepare(string[] participantURLs) returns(boolean voteSuccess) {
-    endpoint<http:HttpClient> participantEP {
+function prepare(string transactionId, string[] participantURLs) returns(boolean voteSuccess) {
+    endpoint<ParticipantClient> participantEP {
+    }
+    voteSuccess = true;
+    int i = 0;
+    while(i < lengthof participantURLs) {
+        ParticipantClient participantClient = create ParticipantClient();
+        bind participantClient with participantEP;
+
+        // TODO If a participant voted NO then abort
+        var status, e = participantEP.prepare(transactionId, participantURLs[i]);
+        if(e != null || status == "aborted") {
+            voteSuccess = false;
+            break;
+        } else if (status == "committed") {
+            // TODO: handle mixed outcome if overall commit fails
+        }
+        i = i + 1;
+    }
+    return;
+}
+
+function notify(string transactionId, string[] participantURLs, string message) {
+    endpoint<ParticipantClient> participantEP {
     }
     int i = 0;
     while(i < lengthof participantURLs) {
-        http:HttpClient participantClient = create http:HttpClient(participantURLs[i], {});
+        ParticipantClient participantClient = create ParticipantClient();
         bind participantClient with participantEP;
-        http:Request req = {};
-        var res, e = participantEP.post("", req);
 
         // TODO If a participant voted NO then abort
-
+        var status, e = participantEP.notify(transactionId, participantURLs[i], message);
+        if(e != null || status == "aborted") {
+            // TODO: handle this
+        } else if (status == "committed") {
+            // TODO: handle mixed outcome if overall commit fails
+        }
         i = i + 1;
     }
-    return false;
-}
-
-function notify(string message) {
-
 }

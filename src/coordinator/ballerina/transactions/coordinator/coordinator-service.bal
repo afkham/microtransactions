@@ -253,8 +253,8 @@ service<http> coordinator {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
             } else {
                 map participants = txn.participants;
-                function(map) returns (boolean) f  = getCoordinationFunction(txn.coordinationType);
-                boolean successful = f(participants); //TODO: Get the result
+                function(string, map) returns (boolean) f  = getCoordinationFunction(txn.coordinationType);
+                boolean successful = f(txnId, participants); //TODO: Get the result
                 // TODO: return response to the initiator
             }
         }

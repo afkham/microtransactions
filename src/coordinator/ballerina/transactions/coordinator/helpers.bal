@@ -48,7 +48,7 @@ function respondToBadRequest (http:Response res, string msg) {
     res.setJsonPayload(resPayload);
 }
 
-function getCoordinationFunction (string coordinationType) returns (function (map) returns (boolean) f) {
+function getCoordinationFunction (string coordinationType) returns (function (string, map) returns (boolean) f) {
     if (coordinationType == TWO_PHASE_COMMIT) {
         f = twoPhaseCommit;
     } else {
