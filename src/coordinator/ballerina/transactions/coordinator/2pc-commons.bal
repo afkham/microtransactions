@@ -1,6 +1,5 @@
 package ballerina.transactions.coordinator;
 
-public const string TWO_PHASE_COMMIT = "2pc";
 public const string PROTOCOL_COMPLETION = "completion";
 public const string PROTOCOL_VOLATILE = "volatile";
 public const string PROTOCOL_DURABLE = "durable";

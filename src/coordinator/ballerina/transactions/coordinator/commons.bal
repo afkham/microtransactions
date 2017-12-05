@@ -2,6 +2,59 @@ package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
 
+const string TRANSACTION_CONTEXT_VERSION = "1.0";
+
+public map transactions = {};
+
+enum TransactionState {
+    PREPARED, COMMITTED, ABORTED
+}
+
+public struct Transaction {
+    string coordinationType = "2pc";
+    TransactionState state;
+    map participants;
+}
+
+public struct Participant {
+    string participantId;
+    Protocol[] participantProtocols;
+    boolean isInitiator;
+}
+
+struct CreateTransactionContextRequest {
+    string participantId;
+    string coordinationType;
+    Protocol[] participantProtocols;
+}
+
+struct TransactionContext {
+    string contextVersion = "1.0";
+    string transactionId;
+    string coordinationType;
+    string registerAtURL;
+}
+
+public struct Protocol {
+    string name;
+    string url;
+}
+
+struct RegistrationRequest {
+    string transactionId;
+    string participantId;
+    Protocol[] participantProtocols;
+}
+
+struct RegistrationResponse {
+    string transactionId;
+    Protocol[] coordinatorProtocols;
+}
+
+struct RequestError {
+    string errorMessage;
+}
+
 function isRegisteredParticipant (string participantId, map participants) returns (boolean) {
     return participants[participantId] != null;
 }
@@ -41,7 +94,7 @@ function protocolCompatible (string coordinationType,
     return participantProtocolIsValid;
 }
 
-function respondToBadRequest (http:Response res, string msg) {
+public function respondToBadRequest (http:Response res, string msg) {
     res.setStatusCode(400);
     RequestError err = {errorMessage:msg};
     var resPayload, _ = <json>err;
