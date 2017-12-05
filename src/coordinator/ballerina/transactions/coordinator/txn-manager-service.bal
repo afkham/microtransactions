@@ -22,7 +22,7 @@ function getCoordinationTypeToProtocolsMap () returns (map m) {
 transformer <json jsonReq, CreateTransactionContextRequest structReq> toStruct() {
     structReq.coordinationType = validateStrings(jsonReq["coordinationType"]);
     structReq.participantId = validateStrings(jsonReq["participantId"]);
-    structReq.participantProtocols = validateProtocols(jsonReq["participantProtocols"]);
+    //structReq.participantProtocols = validateProtocols(jsonReq["participantProtocols"]);
 }
 
 function validateStrings (json j) returns (string) {
@@ -51,7 +51,7 @@ function validateProtocols (json j) returns (Protocol[]) {
 }
 
 @http:configuration {
-    basePath:"/txnmgr",
+    basePath:basePath,
     host:coordinatorHost,
     port:coordinatorPort
 }
@@ -80,15 +80,16 @@ service<http> manager {
                 // Add the initiator, who is also the first participant
                 txn.participants[participant.participantId] = participant;
 
-                string tid = util:uuid();
+                string txnId = util:uuid();
 
                 // Add the map of participants for the transaction with ID tid to the transactions map
-                transactions[tid] = txn;
-                TransactionContext context = {transactionId:tid,
+                transactions[txnId] = txn;
+                TransactionContext context = {transactionId:txnId,
                                                  coordinationType:coordinationType,
-                                                 registerAtURL:"http://" + coordinatorHost + ":" + coordinatorPort + "/register"};
+                                                 registerAtURL:"http://" + coordinatorHost + ":" + coordinatorPort + basePath + registrationPath};
                 var resPayload, _ = <json>context;
                 res.setJsonPayload(resPayload);
+                println("Created transaction " + txnId);
             }
         } catch (error e) {
             res.setStatusCode(400);
@@ -134,7 +135,7 @@ service<http> manager {
     }
 
     @http:resourceConfig {
-        path:"/register"
+        path: registrationPath
     }
     resource register (http:Request req, http:Response res) {
         //register(in: Micro-Transaction-Registration,
@@ -207,6 +208,7 @@ service<http> manager {
                                                            coordinatorProtocols:coordinatorProtocols};
                 var resPayload, _ = <json>registrationRes;
                 res.setJsonPayload(resPayload);
+                println("Registered participant " + participantId + " for transaction " + txnId);
             }
             //TODO: Need to handle the  Cannot-Register error case
         }
