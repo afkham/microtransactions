@@ -47,13 +47,3 @@ function respondToBadRequest (http:Response res, string msg) {
     var resPayload, _ = <json>err;
     res.setJsonPayload(resPayload);
 }
-
-function getCoordinationFunction (string coordinationType) returns (function (string, map) returns (boolean) f) {
-    if (coordinationType == TWO_PHASE_COMMIT) {
-        f = twoPhaseCommit;
-    } else {
-        error e = {msg: "Unknown coordination type: " + coordinationType};
-        throw e;
-    }
-    return;
-}

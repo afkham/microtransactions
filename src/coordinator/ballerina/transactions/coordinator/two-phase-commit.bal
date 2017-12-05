@@ -1,7 +1,5 @@
 package ballerina.transactions.coordinator;
 
-import ballerina.net.http;
-
 public const string TWO_PHASE_COMMIT = "2pc";
 public const string PROTOCOL_COMPLETION = "completion";
 public const string PROTOCOL_VOLATILE = "volatile";
@@ -11,10 +9,41 @@ enum Protocols {
     COMPLETION, DURABLE, VOLATILE
 }
 
-function twoPhaseCommit (string transactionId, map participants) returns (boolean successful) {
+struct CommitRequest {
+    string transactionId;
+}
 
+struct CommitResponse {
+    string message;
+}
+
+struct PrepareRequest {
+    string transactionId;
+}
+
+struct PrepareResponse {
+    string message;
+}
+
+struct NotifyRequest {
+    string transactionId;
+    string message;
+}
+
+struct NotifyResponse {
+    string message;
+}
+
+struct AbortRequest {
+    string transactionId;
+}
+
+struct AbortResponse {
+    string message;
+}
+
+function twoPhaseCommit (string transactionId, map participants) returns (string message) {
     var p, _ = (Participant[])participants.values();
-
     string[] volatileEndpoints = [];
     string[] durableEndpoints = [];
     int i = 0;
@@ -42,17 +71,17 @@ function twoPhaseCommit (string transactionId, map participants) returns (boolea
         if(voteSuccess) {
             notify(transactionId, durableEndpoints, "commit");
             notify(transactionId, volatileEndpoints, "commit");
-            successful = true;
+            message = "committed";
         } else {
             notify(transactionId, durableEndpoints, "abort");
             notify(transactionId, volatileEndpoints, "abort");
-            successful = false;
+            message = "aborted";
         }
     } else {
-        successful = false;
+        message = "aborted";
     }
-
-    return successful;
+    // TODO: message = "mixed" case should be handled
+    return;
 
 
     // If all volatile participants voted YES, get all the durable participants and call prepare on them
@@ -63,10 +92,10 @@ function twoPhaseCommit (string transactionId, map participants) returns (boolea
     // and return aborted to the initiator
 }
 
-function prepare(string transactionId, string[] participantURLs) returns(boolean voteSuccess) {
+function prepare(string transactionId, string[] participantURLs) returns(boolean successful) {
     endpoint<ParticipantClient> participantEP {
     }
-    voteSuccess = true;
+    successful = true;
     int i = 0;
     while(i < lengthof participantURLs) {
         ParticipantClient participantClient = create ParticipantClient();
@@ -75,10 +104,11 @@ function prepare(string transactionId, string[] participantURLs) returns(boolean
         // TODO If a participant voted NO then abort
         var status, e = participantEP.prepare(transactionId, participantURLs[i]);
         if(e != null || status == "aborted") {
-            voteSuccess = false;
+            successful = false;
             break;
         } else if (status == "committed") {
-            // TODO: handle mixed outcome if overall commit fails
+            // TODO: handle mixed outcome if overall commit fails. Mark the transaction as possible mixed outcome.
+            // TODO: Next if the notify fails, then return "mixed" outcome
         }
         i = i + 1;
     }

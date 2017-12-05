@@ -253,9 +253,11 @@ service<http> coordinator {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
             } else {
                 map participants = txn.participants;
-                function(string, map) returns (boolean) f  = getCoordinationFunction(txn.coordinationType);
-                boolean successful = f(txnId, participants); //TODO: Get the result
-                // TODO: return response to the initiator
+                // TODO: return response to the initiator. ( Committed | Aborted | Mixed )
+                string msg = twoPhaseCommit(txnId, participants);
+                CommitResponse commitRes = {message:msg};
+                var resPayload, _ = <json>commitRes;
+                res.setJsonPayload(resPayload);
             }
         }
 

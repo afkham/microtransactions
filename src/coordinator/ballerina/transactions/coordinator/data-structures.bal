@@ -42,27 +42,6 @@ struct RegistrationRequest {
     Protocol[] participantProtocols;
 }
 
-struct CommitRequest {
-    string transactionId;
-}
-
-struct PrepareRequest {
-    string transactionId;
-}
-
-struct PrepareResponse {
-    string message;
-}
-
-struct NotifyRequest {
-    string transactionId;
-    string message;
-}
-
-struct NotifyResponse {
-    string message;
-}
-
 struct RegistrationResponse {
     string transactionId;
     Protocol[] coordinatorProtocols;
