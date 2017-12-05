@@ -7,19 +7,13 @@ enum CoordinationType {
     TWO_PHASE_COMMIT
 }
 
-enum Protocols {
-    COMPLETION, DURABLE, VOLATILE
-}
-
-const string TWO_PHASE_COMMIT = "2pc";
-
 string[] coordinationTypes = [TWO_PHASE_COMMIT];
 
 map coordinationTypeToProtocolsMap = getCoordinationTypeToProtocolsMap();
 function getCoordinationTypeToProtocolsMap () returns (map m) {
     m = {};
-    string[] values = ["completion", "durable", "volatile"];
-    m[TWO_PHASE_COMMIT] = values;
+    string[] twoPhaseCommitProtocols = [PROTOCOL_COMPLETION, PROTOCOL_VOLATILE, PROTOCOL_DURABLE];
+    m[TWO_PHASE_COMMIT] = twoPhaseCommitProtocols;
     return;
 }
 
@@ -62,9 +56,6 @@ function validateProtocols (json j) returns (Protocol[]) {
     port:coordinatorPort
 }
 service<http> coordinator {
-
-    endpoint<http:HttpClient> participantEP {
-    }
 
     @http:resourceConfig {
         path:"/createContext"
@@ -182,21 +173,21 @@ service<http> coordinator {
         } else {
             string participantId = registrationReq.participantId;
             string txnId = registrationReq.transactionId;
-            var coordination, _ = (Transaction)transactions[txnId];
+            var txn, _ = (Transaction)transactions[txnId];
 
-            if (coordination == null) {
+            if (txn == null) {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
-            } else if (isRegisteredParticipant(participantId, coordination.participants)) { // Already-Registered
+            } else if (isRegisteredParticipant(participantId, txn.participants)) { // Already-Registered
                 respondToBadRequest(res,
                                     "Already-Registered. TID:" + txnId + ",participant ID:" + participantId);
-            } else if (!protocolCompatible(coordination.coordinationType,
+            } else if (!protocolCompatible(txn.coordinationType,
                                            registrationReq.participantProtocols)) { // Invalid-Protocol
                 respondToBadRequest(res, "Invalid-Protocol. TID:" + txnId + ",participant ID:" + participantId);
             } else {
                 Participant participant = {participantId:participantId,
                                               participantProtocols:registrationReq.participantProtocols,
                                               isInitiator:false};
-                coordination.participants[participantId] = participant;
+                txn.participants[participantId] = participant;
 
                 // Send the response
                 Protocol[] participantProtocols = registrationReq.participantProtocols;
@@ -248,6 +239,26 @@ service<http> coordinator {
         // Hazard-Outcome
 
         // TODO: impl.
+        // Get the transaction ID from the request
+        var commitReq, e = <CommitRequest>req.getJsonPayload();
+        if (e != null) {
+            res.setStatusCode(400);
+            RequestError err = {errorMessage:"Bad Request"};
+            var resPayload, _ = <json>err;
+            res.setJsonPayload(resPayload);
+        } else {
+            string txnId = commitReq.transactionId;
+            var txn, _ = (Transaction)transactions[txnId];
+            if (txn == null) {
+                respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
+            } else {
+                map participants = txn.participants;
+                function(map) returns (boolean) f  = getCoordinationFunction(txn.coordinationType);
+                boolean successful = f(participants); //TODO: Get the result
+                // TODO: return response to the initiator
+            }
+        }
+
         // Prepare phase & commit phase
         // First get all the volatile participants and call prepare on them
         // If all volatile participants voted YES, get all the durable participants and call prepare on them
@@ -257,8 +268,8 @@ service<http> coordinator {
         // If some durable participants voted NO, next call notify(abort) on all durable participants
         // and return aborted to the initiator
 
-        http:HttpClient participantClient = create http:HttpClient("https://postman-echo.com", {});
-        bind participantClient with participantEP;
+
+        _ = res.send();
     }
 
     resource abortTransaction (http:Request req, http:Response res) {

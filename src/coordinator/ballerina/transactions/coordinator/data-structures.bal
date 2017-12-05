@@ -12,7 +12,7 @@ struct Transaction {
     map participants;
 }
 
-struct Participant {
+public struct Participant {
     string participantId;
     Protocol[] participantProtocols;
     boolean isInitiator;
@@ -31,7 +31,7 @@ struct TransactionContext {
     string registerAtURL;
 }
 
-struct Protocol {
+public struct Protocol {
     string name;
     string url;
 }
@@ -40,6 +40,10 @@ struct RegistrationRequest {
     string transactionId;
     string participantId;
     Protocol[] participantProtocols;
+}
+
+struct CommitRequest {
+    string transactionId;
 }
 
 struct RegistrationResponse {
