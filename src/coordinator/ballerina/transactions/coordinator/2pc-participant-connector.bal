@@ -13,15 +13,19 @@ public connector ParticipantClient () {
         PrepareRequest prepareReq = {transactionId:transactionId};
         var j, _ = <json>prepareReq;
         req.setJsonPayload(j);
-        var res, e = participantEP.post("", req);
+        var res, e = participantEP.post("/prepare", req);
         if (e == null) {
-            res = (http:Response)res;
-            var prepRes, e2 = <PrepareResponse>res.getJsonPayload();
-            if (e2 == null) {
-                PrepareResponse prepareRes = (PrepareResponse)prepRes;
-                status = prepareRes.message;
+            print("++++++++ stat code:");println(res.getStatusCode());
+            if(res.getStatusCode() == 200) {
+                var prepRes, e2 = <PrepareResponse>res.getJsonPayload();
+                if (e2 == null) {
+                    PrepareResponse prepareRes = (PrepareResponse)prepRes;
+                    status = prepareRes.message;
+                } else {
+                    err = (error)e2;
+                }
             } else {
-                err = (error)e2;
+                err = {msg:"Prepare failed. Transaction: " + transactionId + ", Participant: " + participantURL};
             }
         } else {
             err = (error)e;
@@ -39,19 +43,23 @@ public connector ParticipantClient () {
         NotifyRequest notifyReq = {transactionId:transactionId, message:message};
         var j, _ = <json>notifyReq;
         req.setJsonPayload(j);
-        var res, e = participantEP.post("", req);
+        var res, e = participantEP.post("/notify", req);
         if (e == null) {
-            res = (http:Response)res;
-            var notRes, e2 = <NotifyResponse>res.getJsonPayload();
-            if (e2 == null) {
-                NotifyResponse notifyRes = (NotifyResponse)notRes;
-                status = notifyRes.message;
+            if(res.getStatusCode() == 200) {
+                var notRes, e2 = <NotifyResponse>res.getJsonPayload();
+                if (e2 == null) {
+                    NotifyResponse notifyRes = (NotifyResponse)notRes;
+                    status = notifyRes.message;
+                    println("+++++++ Notify respose status:" + status);
+                } else {
+                    err = (error)e2;
+                }
             } else {
-                err = (error)e2;
+                err = {msg:"Notify failed. Transaction: " + transactionId + ", Participant: " + participantURL};
             }
         } else {
             err = (error)e;
         }
-        //TODO impl
+        return;
     }
 }

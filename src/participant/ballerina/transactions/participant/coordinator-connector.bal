@@ -10,7 +10,7 @@ public connector TransactionClient () {
             create http:HttpClient(registerAtURL, {});
         }
         RegistrationRequest regReq = {transactionId:transactionId, participantId:participantId};
-        Protocol[] protocols = [{name:"volatile", url:""}];
+        Protocol[] protocols = [{name:"volatile", url:"http://localhost:8081/"}];
         regReq.participantProtocols = protocols;
 
         var j, _  = <json> regReq;

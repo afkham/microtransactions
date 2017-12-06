@@ -190,6 +190,11 @@ service<http> manager {
                                               isInitiator:false};
                 txn.participants[participantId] = participant;
 
+                print("=========");
+                println(txn.participants);
+                print("+++++++++");
+                println(transactions[txnId]);
+
                 // Send the response
                 Protocol[] participantProtocols = registrationReq.participantProtocols;
                 Protocol[] coordinatorProtocols = [];

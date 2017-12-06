@@ -48,10 +48,15 @@ service<http> twoPcCoordinator {
         } else {
             string txnId = commitReq.transactionId;
             var txn, _ = (Transaction)transactions[txnId];
+            print("----------");
+            println(txn);
             if (txn == null) {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
             } else {
+                println("committing transaction " + txnId);
                 map participants = txn.participants;
+                print("----------");
+                println(participants);
                 // TODO: return response to the initiator. ( Committed | Aborted | Mixed )
                 string msg = twoPhaseCommit(txnId, participants);
                 CommitResponse commitRes = {message:msg};

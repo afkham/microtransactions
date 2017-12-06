@@ -42,32 +42,39 @@ struct AbortResponse {
 }
 
 function twoPhaseCommit (string transactionId, map participants) returns (string message) {
-    var p, _ = (Participant[])participants.values();
+    println("********* running 2pc coordination");
+    println(participants.values());
+    any[] p = participants.values();
+    //println(typeof participants.values());
+    //println(e);
     string[] volatileEndpoints = [];
     string[] durableEndpoints = [];
     int i = 0;
     while (i < lengthof p) {
-        Participant participant = p[i];
+        var participant, _ = (Participant)p[i];
+        println(participant);
         Protocol[] protocols = participant.participantProtocols;
-        int j = 0;
-        while(j < lengthof protocols) {
-            Protocol proto = protocols[j];
-            if(proto.name == PROTOCOL_VOLATILE) {
-                volatileEndpoints[lengthof volatileEndpoints - 1] = proto.url;
-            } else if (proto.name == PROTOCOL_DURABLE) {
-                durableEndpoints[lengthof durableEndpoints - 1] = proto.url;
+        if (protocols != null) {
+            int j = 0;
+            while (j < lengthof protocols) {
+                Protocol proto = protocols[j];
+                if (proto.name == PROTOCOL_VOLATILE) {
+                    volatileEndpoints[lengthof volatileEndpoints] = proto.url;
+                } else if (proto.name == PROTOCOL_DURABLE) {
+                    durableEndpoints[lengthof durableEndpoints] = proto.url;
+                }
+                j = j + 1;
             }
-            j = j + 1;
         }
         i = i + 1;
     }
     // Prepare phase & commit phase
     // First call prepare on all volatile participants
     boolean voteSuccess = prepare(transactionId, volatileEndpoints);
-    if(voteSuccess) {
+    if (voteSuccess) {
         // Next call prepare on all durable participants
         voteSuccess = prepare(transactionId, durableEndpoints);
-        if(voteSuccess) {
+        if (voteSuccess) {
             notify(transactionId, durableEndpoints, "commit");
             notify(transactionId, volatileEndpoints, "commit");
             message = "committed";
@@ -91,18 +98,18 @@ function twoPhaseCommit (string transactionId, map participants) returns (string
     // and return aborted to the initiator
 }
 
-function prepare(string transactionId, string[] participantURLs) returns(boolean successful) {
+function prepare (string transactionId, string[] participantURLs) returns (boolean successful) {
     endpoint<ParticipantClient> participantEP {
     }
     successful = true;
     int i = 0;
-    while(i < lengthof participantURLs) {
+    while (i < lengthof participantURLs) {
         ParticipantClient participantClient = create ParticipantClient();
         bind participantClient with participantEP;
 
         // TODO If a participant voted NO then abort
         var status, e = participantEP.prepare(transactionId, participantURLs[i]);
-        if(e != null || status == "aborted") {
+        if (e != null || status == "aborted") {
             successful = false;
             break;
         } else if (status == "committed") {
@@ -114,17 +121,19 @@ function prepare(string transactionId, string[] participantURLs) returns(boolean
     return;
 }
 
-function notify(string transactionId, string[] participantURLs, string message) {
+function notify (string transactionId, string[] participantURLs, string message) {
     endpoint<ParticipantClient> participantEP {
     }
     int i = 0;
-    while(i < lengthof participantURLs) {
+    while (i < lengthof participantURLs) {
         ParticipantClient participantClient = create ParticipantClient();
         bind participantClient with participantEP;
 
         // TODO If a participant voted NO then abort
         var status, e = participantEP.notify(transactionId, participantURLs[i], message);
-        if(e != null || status == "aborted") {
+        print("++++ Error"); println(e);
+        println("+++++ status:" + status);
+        if (e != null || status == "aborted") {
             // TODO: handle this
         } else if (status == "committed") {
             // TODO: handle mixed outcome if overall commit fails

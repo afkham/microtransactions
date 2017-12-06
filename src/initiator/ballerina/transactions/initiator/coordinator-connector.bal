@@ -13,8 +13,7 @@ public connector TransactionClient () {
         req.setJsonPayload(j);
         var res, e = coordinatorEP.post("", req);
         if(e == null) {
-            http:Response r = (http:Response) res;
-            jsonRes = r.getJsonPayload();
+            jsonRes = res.getJsonPayload();
         } else {
             err = (error) e;
         }
@@ -30,8 +29,7 @@ public connector TransactionClient () {
         req.setJsonPayload(j);
         var res, e = coordinatorEP.post("", req);
         if(e == null) {
-            http:Response r = (http:Response) res;
-            jsonRes = r.getJsonPayload();
+            jsonRes = res.getJsonPayload();
         } else {
             err = (error) e;
         }

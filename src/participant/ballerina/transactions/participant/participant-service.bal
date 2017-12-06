@@ -36,7 +36,7 @@ service<http> participantService {
         var prepareReq, _ = <PrepareRequest>req.getJsonPayload();
         println(prepareReq.transactionId);
 
-        PrepareResponse prepareRes = {message:"readonly"};
+        PrepareResponse prepareRes = {message:"committed"};
 
         var j, _ = <json>prepareRes;
         res.setJsonPayload(j);
