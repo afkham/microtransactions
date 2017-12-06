@@ -15,7 +15,6 @@ public connector ParticipantClient () {
         req.setJsonPayload(j);
         var res, e = participantEP.post("/prepare", req);
         if (e == null) {
-            print("++++++++ stat code:");println(res.getStatusCode());
             if(res.getStatusCode() == 200) {
                 var prepRes, e2 = <PrepareResponse>res.getJsonPayload();
                 if (e2 == null) {

@@ -1,6 +1,7 @@
 package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
+import ballerina.log;
 
 enum CoordinationType {
     TWO_PHASE_COMMIT
@@ -89,7 +90,7 @@ service<http> manager {
                                                  registerAtURL:"http://" + coordinatorHost + ":" + coordinatorPort + basePath + registrationPath};
                 var resPayload, _ = <json>context;
                 res.setJsonPayload(resPayload);
-                println("Created transaction " + txnId);
+                log:printInfo("Created transaction: " + txnId);
             }
         } catch (error e) {
             res.setStatusCode(400);
@@ -190,11 +191,6 @@ service<http> manager {
                                               isInitiator:false};
                 txn.participants[participantId] = participant;
 
-                print("=========");
-                println(txn.participants);
-                print("+++++++++");
-                println(transactions[txnId]);
-
                 // Send the response
                 Protocol[] participantProtocols = registrationReq.participantProtocols;
                 Protocol[] coordinatorProtocols = [];
@@ -213,7 +209,7 @@ service<http> manager {
                                                            coordinatorProtocols:coordinatorProtocols};
                 var resPayload, _ = <json>registrationRes;
                 res.setJsonPayload(resPayload);
-                println("Registered participant " + participantId + " for transaction " + txnId);
+                log:printInfo("Registered participant: " + participantId + " for transaction: " + txnId);
             }
             //TODO: Need to handle the  Cannot-Register error case
         }

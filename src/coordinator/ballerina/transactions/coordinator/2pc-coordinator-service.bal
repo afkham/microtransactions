@@ -1,6 +1,7 @@
 package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
+import ballerina.log;
 
 @http:configuration {
     basePath:"/2pc",
@@ -37,8 +38,6 @@ service<http> twoPcCoordinator {
 
         // Hazard-Outcome
 
-        // TODO: impl.
-        // Get the transaction ID from the request
         var commitReq, e = <CommitRequest>req.getJsonPayload();
         if (e != null) {
             res.setStatusCode(400);
@@ -48,16 +47,12 @@ service<http> twoPcCoordinator {
         } else {
             string txnId = commitReq.transactionId;
             var txn, _ = (TwoPhaseCommitTransaction )transactions[txnId];
-            print("----------");
-            println(txn);
             if (txn == null) {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
             } else {
-                println("committing transaction " + txnId);
+                log:printInfo("Committing transaction: " + txnId);
                 map participants = txn.participants;
-                print("----------");
-                println(participants);
-                // TODO: return response to the initiator. ( Committed | Aborted | Mixed )
+                // return response to the initiator. ( Committed | Aborted | Mixed )
                 string msg = twoPhaseCommit(txn, participants);
                 CommitResponse commitRes = {message:msg};
                 var resPayload, _ = <json>commitRes;
@@ -65,17 +60,6 @@ service<http> twoPcCoordinator {
                 transactions.remove(txnId);
             }
         }
-
-        // Prepare phase & commit phase
-        // First get all the volatile participants and call prepare on them
-        // If all volatile participants voted YES, get all the durable participants and call prepare on them
-        // If all durable participants voted YES (PREPARED or READONLY), next call notify(commit) on all
-        // (durable & volatile) participants
-        // and return committed to the initiator
-        // If some durable participants voted NO, next call notify(abort) on all durable participants
-        // and return aborted to the initiator
-
-
         _ = res.send();
     }
 

@@ -1,4 +1,5 @@
 package ballerina.transactions.coordinator;
+import ballerina.log;
 
 public const string PROTOCOL_COMPLETION = "completion";
 public const string PROTOCOL_VOLATILE = "volatile";
@@ -54,17 +55,13 @@ struct AbortResponse {
 }
 
 function twoPhaseCommit (TwoPhaseCommitTransaction txn, map participants) returns (string message) {
-    println("********* running 2pc coordination");
-    println(participants.values());
+    log:printInfo("Running 2-phase commit for transaction: " + txn.transactionId);
     any[] p = participants.values();
-    //println(typeof participants.values());
-    //println(e);
     string[] volatileEndpoints = [];
     string[] durableEndpoints = [];
     int i = 0;
     while (i < lengthof p) {
         var participant, _ = (Participant)p[i];
-        println(participant);
         Protocol[] protocols = participant.participantProtocols;
         if (protocols != null) {
             int j = 0;
@@ -84,30 +81,33 @@ function twoPhaseCommit (TwoPhaseCommitTransaction txn, map participants) return
     // First call prepare on all volatile participants
     boolean voteSuccess = prepare(txn, volatileEndpoints);
     if (voteSuccess) {
-        // Next call prepare on all durable participants
+        // if all volatile participants voted YES, Next call prepare on all durable participants
         voteSuccess = prepare(txn, durableEndpoints);
         if (voteSuccess) {
+            // If all durable participants voted YES (PREPARED or READONLY), next call notify(commit) on all
+            // (durable & volatile) participants and return committed to the initiator
             notify(txn, durableEndpoints, "commit");
             notify(txn, volatileEndpoints, "commit");
             message = "committed";
         } else {
+            // If some durable participants voted NO, next call notify(abort) on all durable participants
+            // and return aborted to the initiator
             notify(txn, durableEndpoints, "abort");
             notify(txn, volatileEndpoints, "abort");
-            message = "aborted";
+            if (txn.possibleMixedOutcome) {
+                message = "mixed";
+            } else {
+                message = "aborted";
+            }
         }
     } else {
-        message = "aborted";
+        if (txn.possibleMixedOutcome) {
+            message = "mixed";
+        } else {
+            message = "aborted";
+        }
     }
-    // TODO: message = "mixed" case should be handled
     return;
-
-
-    // If all volatile participants voted YES, get all the durable participants and call prepare on them
-    // If all durable participants voted YES (PREPARED or READONLY), next call notify(commit) on all
-    // (durable & volatile) participants
-    // and return committed to the initiator
-    // If some durable participants voted NO, next call notify(abort) on all durable participants
-    // and return aborted to the initiator
 }
 
 function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) returns (boolean successful) {
@@ -120,14 +120,20 @@ function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) retur
         ParticipantClient participantClient = create ParticipantClient();
         bind participantClient with participantEP;
 
+        log:printInfo("Preparing participant: " + participantURLs[i]);
         // If a participant voted NO then abort
         var status, e = participantEP.prepare(transactionId, participantURLs[i]);
         if (e != null || status == "aborted") {
+            log:printInfo("Participant: " + participantURLs[i] + " aborted");
             successful = false;
             break;
         } else if (status == "committed") {
-            // TODO: handle mixed outcome if overall commit fails. Mark the transaction as possible mixed outcome.
-            // TODO: Next if the notify fails, then return "mixed" outcome
+            log:printInfo("Participant: " + participantURLs[i] + " committed");
+            // If one or more participants returns "committed" and the overall prepare fails, we have to
+            // report a mixed-outcome to the initiator
+            txn.possibleMixedOutcome = true;
+        } else if (status == "read-only") {
+            log:printInfo("Participant: " + participantURLs[i] + " read-only");
         }
         i = i + 1;
     }
@@ -143,14 +149,17 @@ function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string
         ParticipantClient participantClient = create ParticipantClient();
         bind participantClient with participantEP;
 
+        log:printInfo("Notify(" + message + ") participant: " + participantURLs[i]);
+
         // TODO If a participant voted NO then abort
         var status, e = participantEP.notify(transactionId, participantURLs[i], message);
         print("++++ Error"); println(e);
         println("+++++ status:" + status);
         if (e != null || status == "aborted") {
+            log:printInfo("Participant: " + participantURLs[i] + " aborted");
             // TODO: handle this
         } else if (status == "committed") {
-            // TODO: handle mixed outcome if overall commit fails
+            log:printInfo("Participant: " + participantURLs[i] + " committed");
         }
         i = i + 1;
     }
