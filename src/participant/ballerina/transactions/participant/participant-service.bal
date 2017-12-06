@@ -52,7 +52,7 @@ service<http> participantService {
 
         NotifyResponse notRes = {message:"committed"};
 
-        var j, _ = <json> notRes;
+        var j, _ = <json>notRes;
         res.setJsonPayload(j);
         _ = res.send();
     }

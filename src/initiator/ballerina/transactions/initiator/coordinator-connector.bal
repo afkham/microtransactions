@@ -1,42 +1,44 @@
 package ballerina.transactions.initiator;
 
 import ballerina.net.http;
+import ballerina.config;
 
 public connector TransactionClient () {
 
-    action createContext(CreateTransactionContextRequest ctcReq) returns (json jsonRes, error err) {
+    action createContext (CreateTransactionContextRequest ctcReq) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> coordinatorEP {
-            create http:HttpClient("http://localhost:8080/txnmgr/createContext", {});
+            create http:HttpClient("http://" + config:getGlobalValue("coordinator.host") + ":" +
+                                   config:getGlobalValue("coordinator.port") + "/txnmgr/createContext", {});
         }
-        var j, _  = <json> ctcReq;
+        var j, _ = <json>ctcReq;
         http:Request req = {};
         req.setJsonPayload(j);
         var res, e = coordinatorEP.post("", req);
-        if(e == null) {
+        if (e == null) {
             jsonRes = res.getJsonPayload();
         } else {
-            err = (error) e;
+            err = (error)e;
         }
         return;
     }
 
-    action commitTransaction(CommitRequest commitReq) returns (json jsonRes, error err){
+    action commitTransaction (CommitRequest commitReq) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> coordinatorEP {
-            create http:HttpClient("http://localhost:8080/2pc/commit", {});
+            create http:HttpClient("http://localhost:9999/2pc/commit", {});
         }
-        var j, _  = <json> commitReq;
+        var j, _ = <json>commitReq;
         http:Request req = {};
         req.setJsonPayload(j);
         var res, e = coordinatorEP.post("", req);
-        if(e == null) {
+        if (e == null) {
             jsonRes = res.getJsonPayload();
         } else {
-            err = (error) e;
+            err = (error)e;
         }
         return;
     }
 
-    action abortTransaction(){
+    action abortTransaction () {
 
     }
 }
