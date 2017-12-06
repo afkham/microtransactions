@@ -4,7 +4,7 @@ import ballerina.config;
 
 public connector BizClient () {
 
-    action call (BizRequest bizReq) returns (json jsonRes, error err) {
+    action call (UpdateStockQuoteRequest bizReq) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> bizEP {
             create http:HttpClient("http://" + config:getGlobalValue("biz.host") + ":" +
                                    config:getGlobalValue("biz.port") + "/updateStockQuote", {});

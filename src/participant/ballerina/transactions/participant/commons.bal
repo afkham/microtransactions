@@ -5,6 +5,13 @@ public struct Protocol {
     string url;
 }
 
+struct UpdateStockQuoteRequest {
+    string transactionId;
+    string registerAtURL;
+    string symbol;
+    float price;
+}
+
 struct RegistrationRequest {
     string transactionId;
     string participantId;

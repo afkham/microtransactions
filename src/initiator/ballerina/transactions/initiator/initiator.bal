@@ -1,6 +1,7 @@
 package ballerina.transactions.initiator;
 
 import ballerina.util;
+import ballerina.math;
 
 public function main (string[] args) {
     println("Initiating transaction...");
@@ -17,10 +18,10 @@ struct CreateTransactionContextRequest {
     string coordinationType;
 }
 
-struct BizRequest {
+struct UpdateStockQuoteRequest {
     string transactionId;
     string registerAtURL;
-    string stockItem;
+    string symbol;
     float price;
 }
 
@@ -36,7 +37,7 @@ function beginTransaction () returns (json) {
     endpoint<TransactionClient> coordinatorEP {
         create TransactionClient();
     }
-    CreateTransactionContextRequest ctcReq = {participantId:util:uuid(), coordinationType:"2pc"};
+    CreateTransactionContextRequest ctcReq = {participantId: util:uuid(), coordinationType:"2pc"};
     var j, e = coordinatorEP.createContext(ctcReq);
     println(e);
     println(j);
@@ -49,8 +50,10 @@ function callBusinessService (json txnContext) {
     }
     var tid, _ = (string )txnContext["transactionId"];
     var regURL, _ = (string )txnContext["registerAtURL"];
-    BizRequest bizReq = {transactionId:tid,
-                            registerAtURL:regURL, stockItem:"GOOG", price:200.67};
+
+    float price = math:randomInRange(200 ,250) + math:random();
+    UpdateStockQuoteRequest bizReq = {transactionId:tid,
+                            registerAtURL:regURL, symbol:"GOOG", price: price};
     var j, e = participantEP.call(bizReq);
     println(e);
     println(j);
