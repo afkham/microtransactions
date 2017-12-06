@@ -47,7 +47,7 @@ service<http> twoPcCoordinator {
             res.setJsonPayload(resPayload);
         } else {
             string txnId = commitReq.transactionId;
-            var txn, _ = (Transaction)transactions[txnId];
+            var txn, _ = (TwoPhaseCommitTransaction )transactions[txnId];
             print("----------");
             println(txn);
             if (txn == null) {
@@ -58,10 +58,11 @@ service<http> twoPcCoordinator {
                 print("----------");
                 println(participants);
                 // TODO: return response to the initiator. ( Committed | Aborted | Mixed )
-                string msg = twoPhaseCommit(txnId, participants);
+                string msg = twoPhaseCommit(txn, participants);
                 CommitResponse commitRes = {message:msg};
                 var resPayload, _ = <json>commitRes;
                 res.setJsonPayload(resPayload);
+                transactions.remove(txnId);
             }
         }
 

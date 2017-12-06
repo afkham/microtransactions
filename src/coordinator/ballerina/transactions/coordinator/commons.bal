@@ -1,18 +1,15 @@
 package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
+import ballerina.util;
 
 const string TRANSACTION_CONTEXT_VERSION = "1.0";
 
-public map transactions = {};
-
-enum TransactionState {
-    PREPARED, COMMITTED, ABORTED
-}
+map transactions = {};
 
 public struct Transaction {
+    string transactionId;
     string coordinationType = "2pc";
-    TransactionState state;
     map participants;
 }
 
@@ -61,8 +58,7 @@ function isRegisteredParticipant (string participantId, map participants) return
 
 function isValidCoordinationType (string coordinationType) returns (boolean) {
     int i = 0;
-    int length = lengthof coordinationTypes;
-    while (i < length) {
+    while (i < lengthof coordinationTypes) {
         if (coordinationType == coordinationTypes[i]) {
             return true;
         }
@@ -73,7 +69,7 @@ function isValidCoordinationType (string coordinationType) returns (boolean) {
 
 function protocolCompatible (string coordinationType,
                              Protocol[] participantProtocols) returns (boolean participantProtocolIsValid) {
-    var validProtocols, e = (string[])coordinationTypeToProtocolsMap[coordinationType];
+    var validProtocols, _ = (string[])coordinationTypeToProtocolsMap[coordinationType];
     int i = 0;
     while (i < lengthof participantProtocols) {
         int j = 0;
@@ -99,4 +95,15 @@ public function respondToBadRequest (http:Response res, string msg) {
     RequestError err = {errorMessage:msg};
     var resPayload, _ = <json>err;
     res.setJsonPayload(resPayload);
+}
+
+function createTransaction(string coordinationType) returns (Transaction txn) {
+    if(coordinationType == TWO_PHASE_COMMIT) {
+        TwoPhaseCommitTransaction twopcTxn = {transactionId: util:uuid(), coordinationType: TWO_PHASE_COMMIT};
+        txn = (Transaction) twopcTxn;
+    } else {
+        error e = {msg: "Unknown coordination type: " + coordinationType};
+        throw e;
+    }
+    return;
 }

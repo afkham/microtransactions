@@ -8,6 +8,18 @@ enum Protocols {
     COMPLETION, DURABLE, VOLATILE
 }
 
+enum TransactionState {
+    PREPARED, COMMITTED, ABORTED
+}
+
+struct TwoPhaseCommitTransaction {
+    string transactionId;
+    string coordinationType = "2pc";
+    map participants;
+    TransactionState state;
+    boolean possibleMixedOutcome;
+}
+
 struct CommitRequest {
     string transactionId;
 }
@@ -41,7 +53,7 @@ struct AbortResponse {
     string message;
 }
 
-function twoPhaseCommit (string transactionId, map participants) returns (string message) {
+function twoPhaseCommit (TwoPhaseCommitTransaction txn, map participants) returns (string message) {
     println("********* running 2pc coordination");
     println(participants.values());
     any[] p = participants.values();
@@ -70,17 +82,17 @@ function twoPhaseCommit (string transactionId, map participants) returns (string
     }
     // Prepare phase & commit phase
     // First call prepare on all volatile participants
-    boolean voteSuccess = prepare(transactionId, volatileEndpoints);
+    boolean voteSuccess = prepare(txn, volatileEndpoints);
     if (voteSuccess) {
         // Next call prepare on all durable participants
-        voteSuccess = prepare(transactionId, durableEndpoints);
+        voteSuccess = prepare(txn, durableEndpoints);
         if (voteSuccess) {
-            notify(transactionId, durableEndpoints, "commit");
-            notify(transactionId, volatileEndpoints, "commit");
+            notify(txn, durableEndpoints, "commit");
+            notify(txn, volatileEndpoints, "commit");
             message = "committed";
         } else {
-            notify(transactionId, durableEndpoints, "abort");
-            notify(transactionId, volatileEndpoints, "abort");
+            notify(txn, durableEndpoints, "abort");
+            notify(txn, volatileEndpoints, "abort");
             message = "aborted";
         }
     } else {
@@ -98,16 +110,17 @@ function twoPhaseCommit (string transactionId, map participants) returns (string
     // and return aborted to the initiator
 }
 
-function prepare (string transactionId, string[] participantURLs) returns (boolean successful) {
+function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) returns (boolean successful) {
     endpoint<ParticipantClient> participantEP {
     }
+    string transactionId = txn.transactionId;
     successful = true;
     int i = 0;
     while (i < lengthof participantURLs) {
         ParticipantClient participantClient = create ParticipantClient();
         bind participantClient with participantEP;
 
-        // TODO If a participant voted NO then abort
+        // If a participant voted NO then abort
         var status, e = participantEP.prepare(transactionId, participantURLs[i]);
         if (e != null || status == "aborted") {
             successful = false;
@@ -121,9 +134,10 @@ function prepare (string transactionId, string[] participantURLs) returns (boole
     return;
 }
 
-function notify (string transactionId, string[] participantURLs, string message) {
+function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string message) {
     endpoint<ParticipantClient> participantEP {
     }
+    string transactionId = txn.transactionId;
     int i = 0;
     while (i < lengthof participantURLs) {
         ParticipantClient participantClient = create ParticipantClient();

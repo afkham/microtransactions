@@ -1,7 +1,6 @@
 package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
-import ballerina.util;
 
 enum CoordinationType {
     TWO_PHASE_COMMIT
@@ -71,16 +70,17 @@ service<http> manager {
                 res.setJsonPayload(resPayload);
             } else {
                 CreateTransactionContextRequest createContextReq = (CreateTransactionContextRequest)ccReq;
+                Transaction txn = createTransaction(coordinationType);
+                //TODO: We may not need to make the initiator a participant
                 Participant participant = {participantId:createContextReq.participantId,
                                               participantProtocols:createContextReq.participantProtocols,
                                               isInitiator:true};
-                Transaction txn = {coordinationType:coordinationType};
                 txn.participants = {};
 
                 // Add the initiator, who is also the first participant
                 txn.participants[participant.participantId] = participant;
 
-                string txnId = util:uuid();
+                string txnId = txn.transactionId;
 
                 // Add the map of participants for the transaction with ID tid to the transactions map
                 transactions[txnId] = txn;
