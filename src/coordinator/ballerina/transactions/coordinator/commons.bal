@@ -22,7 +22,6 @@ public struct Participant {
 struct CreateTransactionContextRequest {
     string participantId;
     string coordinationType;
-    Protocol[] participantProtocols;
 }
 
 struct TransactionContext {

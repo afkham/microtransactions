@@ -19,37 +19,6 @@ function getCoordinationTypeToProtocolsMap () returns (map m) {
     return;
 }
 
-transformer <json jsonReq, CreateTransactionContextRequest structReq> toStruct() {
-    structReq.coordinationType = validateStrings(jsonReq["coordinationType"]);
-    structReq.participantId = validateStrings(jsonReq["participantId"]);
-    //structReq.participantProtocols = validateProtocols(jsonReq["participantProtocols"]);
-}
-
-function validateStrings (json j) returns (string) {
-    if (j == null) {
-        error e = {msg:"Invalid data"};
-        throw e;
-    }
-    var result, _ = (string)j;
-    return result;
-}
-
-function validateProtocols (json j) returns (Protocol[]) {
-    if (j == null) {
-        error e = {msg:"Invalid data"};
-        throw e;
-    }
-    Protocol[] protocols = [];
-    int i = 0;
-    while (i < lengthof j) {
-        json protocolJson = j[i];
-        Protocol protocol = {name:protocolJson["name"].toString(), url:protocolJson["url"].toString()};
-        protocols[i] = protocol;
-        i = i + 1;
-    }
-    return protocols;
-}
-
 @http:configuration {
     basePath:basePath,
     host:coordinatorHost,
@@ -61,8 +30,15 @@ service<http> manager {
         path:"/createContext"
     }
     resource createContext (http:Request req, http:Response res) {
-        try {
-            CreateTransactionContextRequest ccReq = <CreateTransactionContextRequest, toStruct()>req.getJsonPayload();
+        var ccReq, e = <CreateTransactionContextRequest>req.getJsonPayload();
+        if (e != null) {
+            log:printErrorCause("Invalid registration request", (error)e);
+            println(req.getJsonPayload());
+            res.setStatusCode(400);
+            RequestError err = {errorMessage:"Bad Request"};
+            var resPayload, _ = <json>err;
+            res.setJsonPayload(resPayload);
+        } else {
             string coordinationType = ccReq.coordinationType;
             if (!isValidCoordinationType(coordinationType)) {
                 res.setStatusCode(422);
@@ -74,7 +50,6 @@ service<http> manager {
                 Transaction txn = createTransaction(coordinationType);
                 //TODO: We may not need to make the initiator a participant
                 Participant participant = {participantId:createContextReq.participantId,
-                                              participantProtocols:createContextReq.participantProtocols,
                                               isInitiator:true};
                 txn.participants = {};
 
@@ -92,51 +67,12 @@ service<http> manager {
                 res.setJsonPayload(resPayload);
                 log:printInfo("Created transaction: " + txnId);
             }
-        } catch (error e) {
-            res.setStatusCode(400);
-            RequestError err = {errorMessage:"Bad Request"};
-            var resPayload, _ = <json>err;
-            res.setJsonPayload(resPayload);
         }
-        //CreateTransactionContextRequest ccReq = <CreateTransactionContextRequest>req.getJsonPayload();
-        //if (e != null) {
-        //    res.setStatusCode(400);
-        //    RequestError err = {errorMessage:"Bad Request"};
-        //    var resPayload, _ = <json>err;
-        //    res.setJsonPayload(resPayload);
-        //} else {
-        //    string coordinationType = ccReq.coordinationType;
-        //    if (!isValidCoordinationType(coordinationType)) {
-        //        res.setStatusCode(422);
-        //        RequestError err = {errorMessage:"Invalid-Coordination-Type:" + coordinationType};
-        //        var resPayload, _ = <json>err;
-        //        res.setJsonPayload(resPayload);
-        //    } else {
-        //        CreateTransactionContextRequest createContextReq = (CreateTransactionContextRequest)ccReq;
-        //        Participant participant = {participantId:createContextReq.participantId,
-        //                                      participantProtocols:createContextReq.participantProtocols,
-        //                                      isInitiator:true};
-        //        map transactionParticipants = {};
-        //        // Add the initiator, who is also the first participant
-        //        transactionParticipants[participant.participantId] = participant;
-        //
-        //        string tid = util:uuid();
-        //
-        //        // Add the map of participants for the transaction with ID tid to the transactions map
-        //        transactions[tid] = transactionParticipants;
-        //        TransactionContext context = {transactionId:tid,
-        //                                         coordinationType:coordinationType,
-        //                                         registerAtURL:"http://"+ coordinatorHost + ":" + coordinatorPort + "/register"};
-        //        transactionContexts[tid] = context;
-        //        var resPayload, _ = <json>context;
-        //        res.setJsonPayload(resPayload);
-        //    }
-        //}
         _ = res.send();
     }
 
     @http:resourceConfig {
-        path: registrationPath
+        path:registrationPath
     }
     resource register (http:Request req, http:Response res) {
         //register(in: Micro-Transaction-Registration,

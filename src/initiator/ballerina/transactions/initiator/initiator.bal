@@ -54,7 +54,8 @@ function callBusinessService (json txnContext) {
     float price = math:randomInRange(200 ,250) + math:random();
     UpdateStockQuoteRequest bizReq = {transactionId:tid,
                             registerAtURL:regURL, symbol:"GOOG", price: price};
-    var j, e = participantEP.call(bizReq);
+    var j, e = participantEP.call(bizReq, "127.0.0.1", 8888);
+    j, e = participantEP.call(bizReq, "127.0.0.1", 8889);
     println(e);
     println(j);
 }

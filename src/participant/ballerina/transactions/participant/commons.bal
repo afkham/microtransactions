@@ -1,5 +1,16 @@
 package ballerina.transactions.participant;
 
+enum TransactionState {
+    ACTIVE, PREPARED, COMMITTED, ABORTED
+}
+
+struct TwoPhaseCommitTransaction {
+    string transactionId;
+    string coordinationType = "2pc";
+    map participants;
+    TransactionState state;
+}
+
 public struct Protocol {
     string name;
     string url;

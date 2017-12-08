@@ -4,10 +4,9 @@ import ballerina.config;
 
 public connector BizClient () {
 
-    action call (UpdateStockQuoteRequest bizReq) returns (json jsonRes, error err) {
+    action call (UpdateStockQuoteRequest bizReq, string host, int port) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> bizEP {
-            create http:HttpClient("http://" + config:getGlobalValue("biz.host") + ":" +
-                                   config:getGlobalValue("biz.port") + "/updateStockQuote", {});
+            create http:HttpClient("http://" + host + ":" + port + "/updateStockQuote", {});
         }
         var j, _ = <json>bizReq;
         http:Request req = {};

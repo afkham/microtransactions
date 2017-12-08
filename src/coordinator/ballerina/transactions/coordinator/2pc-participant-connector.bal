@@ -15,11 +15,17 @@ public connector ParticipantClient () {
         req.setJsonPayload(j);
         var res, e = participantEP.post("/prepare", req);
         if (e == null) {
-            if(res.getStatusCode() == 200) {
-                var prepRes, e2 = <PrepareResponse>res.getJsonPayload();
+            if (res.getStatusCode() == 200) {
+                var prepareRes, e2 = <PrepareResponse>res.getJsonPayload();
                 if (e2 == null) {
-                    PrepareResponse prepareRes = (PrepareResponse)prepRes;
                     status = prepareRes.message;
+                } else {
+                    err = (error)e2;
+                }
+            } else if (res.getStatusCode() == 404) { // micro-transaction unknown
+                var prepareRes, e2 = <PrepareResponse>res.getJsonPayload();
+                if (e2 == null) {
+                    err = {msg: prepareRes.message};
                 } else {
                     err = (error)e2;
                 }
@@ -29,7 +35,6 @@ public connector ParticipantClient () {
         } else {
             err = (error)e;
         }
-        //TODO: handle micro-transaction unknown
         return;
     }
 
@@ -44,12 +49,18 @@ public connector ParticipantClient () {
         req.setJsonPayload(j);
         var res, e = participantEP.post("/notify", req);
         if (e == null) {
-            if(res.getStatusCode() == 200) {
-                var notRes, e2 = <NotifyResponse>res.getJsonPayload();
+            if (res.getStatusCode() == 200) {
+                var notifyRes, e2 = <NotifyResponse>res.getJsonPayload();
                 if (e2 == null) {
-                    NotifyResponse notifyRes = (NotifyResponse)notRes;
                     status = notifyRes.message;
                     println("+++++++ Notify respose status:" + status);
+                } else {
+                    err = (error)e2;
+                }
+            } else if (res.getStatusCode() == 404 || res.getStatusCode() == 400) { // micro-transaction unknown or not-prepared
+                var notifyRes, e2 = <NotifyResponse>res.getJsonPayload();
+                if (e2 == null) {
+                    err = {msg:notifyRes.message};
                 } else {
                     err = (error)e2;
                 }

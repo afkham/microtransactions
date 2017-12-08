@@ -10,7 +10,7 @@ enum Protocols {
 }
 
 enum TransactionState {
-    PREPARED, COMMITTED, ABORTED
+    ACTIVE, PREPARED, COMMITTED, ABORTED
 }
 
 struct TwoPhaseCommitTransaction {
@@ -153,8 +153,10 @@ function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string
 
         // TODO If a participant voted NO then abort
         var status, e = participantEP.notify(transactionId, participantURLs[i], message);
-        print("++++ Error"); println(e);
+        print("++++ Error:"); println(e);
         println("+++++ status:" + status);
+
+        // TODO: participant may return "Transaction-Unknown", "Not-Prepared" or "Failed-EOT"
         if (e != null || status == "aborted") {
             log:printInfo("Participant: " + participantURLs[i] + " aborted");
             // TODO: handle this

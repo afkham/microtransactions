@@ -28,10 +28,9 @@ service<http> participantService {
                       ", symbol:" + updateReq.symbol + ", price:" + updateReq.price);
         log:printInfo("Registering for transaction: " + transactionId + " with coordinator: " + registerAtURL);
         var j, e = coordinatorEP.register(transactionId, participantId, registerAtURL);
-        println(j);
-        println(e);
 
-        transactions[transactionId] = transactionId;
+        TwoPhaseCommitTransaction txn = {transactionId:transactionId, state:TransactionState.ACTIVE};
+        transactions[transactionId] = txn;
         map tmpStocks = {};
         tmpStocks[updateReq.symbol] = updateReq.price;
         stockCache.put(transactionId, tmpStocks);
@@ -45,12 +44,14 @@ service<http> participantService {
         var prepareReq, _ = <PrepareRequest>req.getJsonPayload();
         string transactionId = prepareReq.transactionId;
         log:printInfo("Prepare received for transaction: " + transactionId);
-        if (transactions[transactionId] == null) {
+        var txn, _ = (TwoPhaseCommitTransaction)transactions[transactionId];
+        if (txn == null) {
             res.setStatusCode(404);
             PrepareResponse prepareRes = {message:"Transaction-Unknown"};
             var j, _ = <json>prepareRes;
             res.setJsonPayload(j);
         } else {
+            txn.state = TransactionState.PREPARED;
             PrepareResponse prepareRes = {message:"prepared"};
             log:printInfo("Prepared");
             var j, _ = <json>prepareRes;
@@ -60,28 +61,33 @@ service<http> participantService {
     }
 
     resource notify (http:Request req, http:Response res) {
-        var notReq, _ = <NotifyRequest>req.getJsonPayload();
-        string transactionId = notReq.transactionId;
-        log:printInfo("Notify(" + notReq.message + ") received for transaction: " + transactionId);
+        var notifyReq, _ = <NotifyRequest>req.getJsonPayload();
+        string transactionId = notifyReq.transactionId;
+        log:printInfo("Notify(" + notifyReq.message + ") received for transaction: " + transactionId);
 
         NotifyResponse notifyRes;
-        if(transactions[transactionId] == null) {
+        var txn, _ = (TwoPhaseCommitTransaction)transactions[transactionId];
+        if (txn == null) {
             res.setStatusCode(404);
             notifyRes = {message:"Transaction-Unknown"};
-            var j, _ = <json>notifyRes;
-            res.setJsonPayload(j);
         } else {
-            if (notReq.message == "commit") {
-                notifyRes = {message:"committed"};
-                var tmpStocks, _ = (map) stockCache.get(transactionId);
-                string[] symbols = tmpStocks.keys();
-                int i = 0;
-                while(i < lengthof symbols) {
-                    persistentStocks[symbols[i]] = tmpStocks[symbols[i]];
-                    i = i + 1;
+            if (notifyReq.message == "commit") {
+                if (txn.state != TransactionState.PREPARED) {
+                    res.setStatusCode(400);
+                    notifyRes = {message:"Not-Prepared"};
+                } else {
+                    notifyRes = {message:"committed"};
+                    var tmpStocks, _ = (map)stockCache.get(transactionId);
+                    string[] symbols = tmpStocks.keys();
+                    int i = 0;
+                    while (i < lengthof symbols) {
+                        persistentStocks[symbols[i]] = tmpStocks[symbols[i]];
+                        i = i + 1;
+                    }
+                    println(persistentStocks);
+                    log:printInfo("Peristed all stocks");
                 }
-                log:printInfo("Peristed all stocks");
-            } else if (notReq.message == "abort") {
+            } else if (notifyReq.message == "abort") {
                 notifyRes = {message:"aborted"};
                 stockCache.remove(transactionId);
             }
@@ -93,7 +99,7 @@ service<http> participantService {
     }
 
     resource abortTransaction (http:Request req, http:Response res) {
-
+        // TODO impl
         _ = res.send();
     }
 }
