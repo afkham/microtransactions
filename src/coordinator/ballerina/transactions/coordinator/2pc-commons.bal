@@ -126,7 +126,7 @@ function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) retur
         // If a participant voted NO then abort
         var status, e = participantEP.prepare(transactionId, participantURLs[i]);
         if (e != null || status == "aborted") {
-            log:printInfo("Participant: " + participantURLs[i] + " aborted");
+            log:printInfo("Participant: " + participantURLs[i] + " failed or aborted");
             successful = false;
             break;
         } else if (status == "committed") {
@@ -134,8 +134,14 @@ function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) retur
             // If one or more participants returns "committed" and the overall prepare fails, we have to
             // report a mixed-outcome to the initiator
             txn.possibleMixedOutcome = true;
+            // Don't send notify to this participant because it is has already committed. We can forget about this participant.
+            participantURLs[i] = null; //TODO: Nulling this out because there is no way to remove an element from an array
         } else if (status == "read-only") {
             log:printInfo("Participant: " + participantURLs[i] + " read-only");
+            // Don't send notify to this participant because it is read-only. We can forget about this participant.
+            participantURLs[i] = null; //TODO: Nulling this out because there is no way to remove an element from an array
+        } else {
+            log:printInfo("Participant: " + participantURLs[i] + ", status: " + status);
         }
         i = i + 1;
     }
@@ -167,7 +173,10 @@ function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string
     string transactionId = txn.transactionId;
     int i = 0;
     while (i < lengthof participantURLs) {
-        status = notifyParticipant(transactionId, participantURLs[i], message); //TODO: Properly handle status
+        string participantURL = participantURLs[i];
+        if(participantURL != null) {
+            status = notifyParticipant(transactionId, participantURL, message); //TODO: Properly handle status
+        }
         i = i + 1;
     }
     return;

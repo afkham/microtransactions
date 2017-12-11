@@ -16,7 +16,7 @@ public connector ParticipantClient () {
         var res, communicationErr = participantEP.post("/prepare", req);
         if (communicationErr == null) {
             var prepareRes, transformErr = <PrepareResponse>res.getJsonPayload();
-            if (transformErr != null) {
+            if (transformErr == null) {
                 int statusCode = res.getStatusCode();
                 string msg = prepareRes.message;
                 if (statusCode == 200) {

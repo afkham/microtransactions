@@ -52,7 +52,8 @@ service<http> participantService {
             res.setJsonPayload(j);
         } else {
             txn.state = TransactionState.PREPARED;
-            PrepareResponse prepareRes = {message:"prepared"};
+            PrepareResponse prepareRes = {message:"read-only"};
+            //PrepareResponse prepareRes = {message:"prepared"};
             log:printInfo("Prepared");
             var j, _ = <json>prepareRes;
             res.setJsonPayload(j);
