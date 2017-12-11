@@ -9,9 +9,9 @@ public function main (string[] args) {
     json txnContext = beginTransaction();
 
     callBusinessService(txnContext);
-    //_ = commitTransaction(txnContext);
-    _ = abortTransaction(txnContext);
-    sleep(1000);
+    _ = commitTransaction(txnContext);
+    //_ = abortTransaction(txnContext);
+    //sleep(1000);
 }
 
 struct CreateTransactionContextRequest {

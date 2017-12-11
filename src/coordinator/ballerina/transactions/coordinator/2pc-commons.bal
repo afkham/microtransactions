@@ -102,6 +102,7 @@ function twoPhaseCommit (TwoPhaseCommitTransaction txn) returns (string message)
             }
         }
     } else {
+        string status = notify(txn, volatileEndpoints, "abort"); //TODO: Properly handle status
         if (txn.possibleMixedOutcome) {
             message = "mixed";
         } else {

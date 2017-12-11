@@ -85,7 +85,7 @@ service<http> participantService {
                         i = i + 1;
                     }
                     println(persistentStocks);
-                    log:printInfo("Peristed all stocks");
+                    log:printInfo("Persisted all stocks");
                 }
             } else if (notifyReq.message == "abort") {
                 notifyRes = {message:"aborted"};

@@ -13,27 +13,24 @@ public connector ParticipantClient () {
         PrepareRequest prepareReq = {transactionId:transactionId};
         var j, _ = <json>prepareReq;
         req.setJsonPayload(j);
-        var res, e = participantEP.post("/prepare", req);
-        if (e == null) {
-            if (res.getStatusCode() == 200) {
-                var prepareRes, e2 = <PrepareResponse>res.getJsonPayload();
-                if (e2 == null) {
-                    status = prepareRes.message;
+        var res, communicationErr = participantEP.post("/prepare", req);
+        if (communicationErr == null) {
+            var prepareRes, transformErr = <PrepareResponse>res.getJsonPayload();
+            if (transformErr != null) {
+                int statusCode = res.getStatusCode();
+                string msg = prepareRes.message;
+                if (statusCode == 200) {
+                    status = msg;
+                } else if (statusCode == 404 && msg == "Transaction-Unknown") {
+                    err = {msg:msg};
                 } else {
-                    err = (error)e2;
-                }
-            } else if (res.getStatusCode() == 404) { // micro-transaction unknown
-                var prepareRes, e2 = <PrepareResponse>res.getJsonPayload();
-                if (e2 == null) {
-                    err = {msg: prepareRes.message};
-                } else {
-                    err = (error)e2;
+                    err = {msg:"Prepare failed. Transaction: " + transactionId + ", Participant: " + participantURL};
                 }
             } else {
-                err = {msg:"Prepare failed. Transaction: " + transactionId + ", Participant: " + participantURL};
+                err = (error)transformErr;
             }
         } else {
-            err = (error)e;
+            err = (error)communicationErr;
         }
         return;
     }
@@ -47,28 +44,31 @@ public connector ParticipantClient () {
         NotifyRequest notifyReq = {transactionId:transactionId, message:message};
         var j, _ = <json>notifyReq;
         req.setJsonPayload(j);
-        var res, e = participantEP.post("/notify", req);
-        if (e == null) {
-            if (res.getStatusCode() == 200) {
-                var notifyRes, e2 = <NotifyResponse>res.getJsonPayload();
-                if (e2 == null) {
-                    status = notifyRes.message;
-                    println("+++++++ Notify respose status:" + status);
+        var res, communicationErr = participantEP.post("/notify", req);
+        if (communicationErr == null) {
+            var notifyRes, transformErr = <NotifyResponse>res.getJsonPayload();
+            if (transformErr == null) {
+                int statusCode = res.getStatusCode();
+                string msg = notifyRes.message;
+                if (statusCode == 200) {
+                    if (transformErr == null) {
+                        status = msg;
+                        println("+++++++ Notify respose status:" + status);
+                    } else {
+                        err = (error)transformErr;
+                    }
+                } else if ((statusCode == 400 && msg == "Not-Prepared") ||
+                           (statusCode == 404 && msg == "Transaction-Unknown") ||
+                           (statusCode == 500 && msg == "Failed-EOT")) {
+                    err = {msg:msg};
                 } else {
-                    err = (error)e2;
-                }
-            } else if (res.getStatusCode() == 404 || res.getStatusCode() == 400) { // micro-transaction unknown or not-prepared
-                var notifyRes, e2 = <NotifyResponse>res.getJsonPayload();
-                if (e2 == null) {
-                    err = {msg:notifyRes.message};
-                } else {
-                    err = (error)e2;
+                    err = {msg:"Notify failed. Transaction: " + transactionId + ", Participant: " + participantURL};
                 }
             } else {
-                err = {msg:"Notify failed. Transaction: " + transactionId + ", Participant: " + participantURL};
+                err = (error)transformErr;
             }
         } else {
-            err = (error)e;
+            err = (error)communicationErr;
         }
         return;
     }
