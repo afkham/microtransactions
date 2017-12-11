@@ -54,8 +54,9 @@ struct AbortResponse {
     string message;
 }
 
-function twoPhaseCommit (TwoPhaseCommitTransaction txn, map participants) returns (string message) {
+function twoPhaseCommit (TwoPhaseCommitTransaction txn) returns (string message) {
     log:printInfo("Running 2-phase commit for transaction: " + txn.transactionId);
+    map participants = txn.participants;
     any[] p = participants.values();
     string[] volatileEndpoints = [];
     string[] durableEndpoints = [];
@@ -86,14 +87,14 @@ function twoPhaseCommit (TwoPhaseCommitTransaction txn, map participants) return
         if (voteSuccess) {
             // If all durable participants voted YES (PREPARED or READONLY), next call notify(commit) on all
             // (durable & volatile) participants and return committed to the initiator
-            notify(txn, durableEndpoints, "commit");
-            notify(txn, volatileEndpoints, "commit");
+            string status = notify(txn, durableEndpoints, "commit"); //TODO: Properly handle status
+            status = notify(txn, volatileEndpoints, "commit"); //TODO: Properly handle status
             message = "committed";
         } else {
             // If some durable participants voted NO, next call notify(abort) on all durable participants
             // and return aborted to the initiator
-            notify(txn, durableEndpoints, "abort");
-            notify(txn, volatileEndpoints, "abort");
+            string status = notify(txn, durableEndpoints, "abort"); //TODO: Properly handle status
+            status = notify(txn, volatileEndpoints, "abort"); //TODO: Properly handle status
             if (txn.possibleMixedOutcome) {
                 message = "mixed";
             } else {
@@ -140,29 +141,56 @@ function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) retur
     return;
 }
 
-function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string message) {
-    endpoint<ParticipantClient> participantEP {
-    }
+function notifyAll (TwoPhaseCommitTransaction txn, string message) returns (string status) {
+    map participants = txn.participants;
     string transactionId = txn.transactionId;
+    any[] p = participants.values();
     int i = 0;
-    while (i < lengthof participantURLs) {
-        ParticipantClient participantClient = create ParticipantClient();
-        bind participantClient with participantEP;
-
-        log:printInfo("Notify(" + message + ") participant: " + participantURLs[i]);
-
-        // TODO If a participant voted NO then abort
-        var status, e = participantEP.notify(transactionId, participantURLs[i], message);
-        print("++++ Error:"); println(e);
-        println("+++++ status:" + status);
-
-        // TODO: participant may return "Transaction-Unknown", "Not-Prepared" or "Failed-EOT"
-        if (e != null || status == "aborted") {
-            log:printInfo("Participant: " + participantURLs[i] + " aborted");
-            // TODO: handle this
-        } else if (status == "committed") {
-            log:printInfo("Participant: " + participantURLs[i] + " committed");
+    while (i < lengthof p) {
+        var participant, _ = (Participant)p[i];
+        Protocol[] protocols = participant.participantProtocols;
+        if (protocols != null) {
+            int j = 0;
+            while (j < lengthof protocols) {
+                Protocol proto = protocols[j];
+                status = notifyParticipant(transactionId, proto.url, message); //TODO: Properly handle status
+                j = j + 1;
+            }
         }
         i = i + 1;
     }
+    return;
+}
+
+function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string message) returns (string status) {
+    string transactionId = txn.transactionId;
+    int i = 0;
+    while (i < lengthof participantURLs) {
+        status = notifyParticipant(transactionId, participantURLs[i], message); //TODO: Properly handle status
+        i = i + 1;
+    }
+    return;
+}
+
+function notifyParticipant(string transactionId, string url, string message) returns (string){
+    endpoint<ParticipantClient> participantEP {
+    }
+    ParticipantClient participantClient = create ParticipantClient();
+    bind participantClient with participantEP;
+
+    log:printInfo("Notify(" + message + ") participant: " + url);
+
+    // TODO If a participant voted NO then abort
+    var status, e = participantEP.notify(transactionId, url, message);
+    print("++++ Error:"); println(e);
+    println("+++++ status:" + status);
+
+    // TODO: participant may return "Transaction-Unknown", "Not-Prepared" or "Failed-EOT"
+    if (e != null || status == "aborted") {
+        log:printInfo("Participant: " + url + " aborted");
+        // TODO: handle this
+    } else if (status == "committed") {
+        log:printInfo("Participant: " + url + " committed");
+    }
+    return status;
 }

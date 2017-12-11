@@ -9,7 +9,8 @@ public function main (string[] args) {
     json txnContext = beginTransaction();
 
     callBusinessService(txnContext);
-    _ = commitTransaction(txnContext);
+    //_ = commitTransaction(txnContext);
+    _ = abortTransaction(txnContext);
     sleep(1000);
 }
 
@@ -30,6 +31,14 @@ struct CommitRequest {
 }
 
 struct CommitResponse {
+    string message;
+}
+
+struct AbortRequest {
+    string transactionId;
+}
+
+struct AbortResponse {
     string message;
 }
 
@@ -72,6 +81,14 @@ function commitTransaction (json txnContext) returns (json) {
     return j;
 }
 
-function abortTransaction () {
-
+function abortTransaction (json txnContext) returns (json) {
+    endpoint<TransactionClient> coordinatorEP {
+        create TransactionClient();
+    }
+    var txnId, _ = (string) txnContext["transactionId"];
+    AbortRequest abortReq = {transactionId:txnId};
+    var j, e = coordinatorEP.abortTransaction(abortReq);
+    println(e);
+    println(j);
+    return j;
 }

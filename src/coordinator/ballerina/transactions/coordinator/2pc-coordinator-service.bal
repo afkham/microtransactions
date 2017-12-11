@@ -46,14 +46,13 @@ service<http> twoPcCoordinator {
             res.setJsonPayload(resPayload);
         } else {
             string txnId = commitReq.transactionId;
-            var txn, _ = (TwoPhaseCommitTransaction )transactions[txnId];
+            var txn, _ = (TwoPhaseCommitTransaction)transactions[txnId];
             if (txn == null) {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
             } else {
                 log:printInfo("Committing transaction: " + txnId);
-                map participants = txn.participants;
                 // return response to the initiator. ( Committed | Aborted | Mixed )
-                string msg = twoPhaseCommit(txn, participants);
+                string msg = twoPhaseCommit(txn);
                 CommitResponse commitRes = {message:msg};
                 var resPayload, _ = <json>commitRes;
                 res.setJsonPayload(resPayload);
@@ -67,7 +66,27 @@ service<http> twoPcCoordinator {
         path:"/abort"
     }
     resource abortTransaction (http:Request req, http:Response res) {
-
+        var abortReq, e = <AbortRequest>req.getJsonPayload();
+        if (e != null) {
+            res.setStatusCode(400);
+            RequestError err = {errorMessage:"Bad Request"};
+            var resPayload, _ = <json>err;
+            res.setJsonPayload(resPayload);
+        } else {
+            string txnId = abortReq.transactionId;
+            var txn, _ = (TwoPhaseCommitTransaction)transactions[txnId];
+            if (txn == null) {
+                respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
+            } else {
+                log:printInfo("Aborting transaction: " + txnId);
+                string msg = notifyAll(txn, "abort");
+                AbortResponse abortRes = {message:msg};
+                var resPayload, _ = <json>abortRes;
+                res.setJsonPayload(resPayload);
+                transactions.remove(txnId);
+            }
+        }
+        _ = res.send();
     }
 
     @http:resourceConfig {

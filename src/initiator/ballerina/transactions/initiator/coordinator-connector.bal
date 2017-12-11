@@ -38,7 +38,19 @@ public connector TransactionClient () {
         return;
     }
 
-    action abortTransaction () {
-
+    action abortTransaction (AbortRequest abortReq) returns (json jsonRes, error err) {
+        endpoint<http:HttpClient> coordinatorEP {
+            create http:HttpClient("http://localhost:9999/2pc/abort", {});
+        }
+        var j, _ = <json>abortReq;
+        http:Request req = {};
+        req.setJsonPayload(j);
+        var res, e = coordinatorEP.post("", req);
+        if (e == null) {
+            jsonRes = res.getJsonPayload();
+        } else {
+            err = (error)e;
+        }
+        return;
     }
 }
