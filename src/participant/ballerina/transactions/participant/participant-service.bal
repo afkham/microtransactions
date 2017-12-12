@@ -22,21 +22,30 @@ service<http> participantService {
             create TransactionClient();
         }
         var updateReq, _ = <UpdateStockQuoteRequest>req.getJsonPayload();
-        string transactionId = updateReq.transactionId;
-        string registerAtURL = updateReq.registerAtURL;
+        string transactionId = req.getHeader("X-XID");
+        string registerAtURL = req.getHeader("X-Register-At-URL");
         log:printInfo("Update stock quote request received. Transaction: " + transactionId +
                       ", symbol:" + updateReq.symbol + ", price:" + updateReq.price);
         log:printInfo("Registering for transaction: " + transactionId + " with coordinator: " + registerAtURL);
         var j, e = coordinatorEP.register(transactionId, participantId, registerAtURL);
+        println(j);
+        if (e == null) {
+            log:printInfo("Registered with coordinator for transaction: " + transactionId);
 
-        TwoPhaseCommitTransaction txn = {transactionId:transactionId, state:TransactionState.ACTIVE};
-        transactions[transactionId] = txn;
-        map tmpStocks = {};
-        tmpStocks[updateReq.symbol] = updateReq.price;
-        stockCache.put(transactionId, tmpStocks);
+            TwoPhaseCommitTransaction txn = {transactionId:transactionId, state:TransactionState.ACTIVE};
+            transactions[transactionId] = txn;
+            map tmpStocks = {};
+            tmpStocks[updateReq.symbol] = updateReq.price;
+            stockCache.put(transactionId, tmpStocks);
 
-        json j2 = {"message":"updating stock"};
-        res.setJsonPayload(j2);
+            json jsonRes = {"message":"updating stock"};
+            res.setJsonPayload(jsonRes);
+        } else {
+            log:printErrorCause("Cannot register with coordinator for transaction: " + transactionId, e);
+            res.setStatusCode(400);
+            json jsonRes = {"message":"Cannot register for transaction: " + transactionId};
+            res.setJsonPayload(jsonRes);
+        }
         _ = res.send();
     }
 
@@ -52,8 +61,8 @@ service<http> participantService {
             res.setJsonPayload(j);
         } else {
             txn.state = TransactionState.PREPARED;
-            PrepareResponse prepareRes = {message:"read-only"};
-            //PrepareResponse prepareRes = {message:"prepared"};
+            //PrepareResponse prepareRes = {message:"read-only"};
+            PrepareResponse prepareRes = {message:"prepared"};
             log:printInfo("Prepared");
             var j, _ = <json>prepareRes;
             res.setJsonPayload(j);

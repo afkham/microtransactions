@@ -17,8 +17,6 @@ public struct Protocol {
 }
 
 struct UpdateStockQuoteRequest {
-    string transactionId;
-    string registerAtURL;
     string symbol;
     float price;
 }

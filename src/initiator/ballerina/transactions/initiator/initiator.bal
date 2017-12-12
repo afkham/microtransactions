@@ -20,8 +20,6 @@ struct CreateTransactionContextRequest {
 }
 
 struct UpdateStockQuoteRequest {
-    string transactionId;
-    string registerAtURL;
     string symbol;
     float price;
 }
@@ -57,14 +55,13 @@ function callBusinessService (json txnContext) {
     endpoint<BizClient> participantEP {
         create BizClient();
     }
-    var tid, _ = (string )txnContext["transactionId"];
+    var txnId, _ = (string)txnContext["transactionId"];
     var regURL, _ = (string )txnContext["registerAtURL"];
 
     float price = math:randomInRange(200 ,250) + math:random();
-    UpdateStockQuoteRequest bizReq = {transactionId:tid,
-                            registerAtURL:regURL, symbol:"GOOG", price: price};
-    var j, e = participantEP.call(bizReq, "127.0.0.1", 8888);
-    j, e = participantEP.call(bizReq, "127.0.0.1", 8889);
+    UpdateStockQuoteRequest bizReq = {symbol:"GOOG", price: price};
+    var j, e = participantEP.call(txnId, regURL, bizReq, "127.0.0.1", 8888);
+    j, e = participantEP.call(txnId, regURL, bizReq, "127.0.0.1", 8889);
     println(e);
     println(j);
 }

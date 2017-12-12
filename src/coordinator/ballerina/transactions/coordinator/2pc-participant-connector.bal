@@ -53,7 +53,6 @@ public connector ParticipantClient () {
                 if (statusCode == 200) {
                     if (transformErr == null) {
                         status = msg;
-                        println("+++++++ Notify respose status:" + status);
                     } else {
                         err = (error)transformErr;
                     }

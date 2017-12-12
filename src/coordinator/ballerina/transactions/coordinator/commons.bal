@@ -2,6 +2,7 @@ package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
 import ballerina.util;
+import ballerina.log;
 
 const string TRANSACTION_CONTEXT_VERSION = "1.0";
 
@@ -90,6 +91,7 @@ function protocolCompatible (string coordinationType,
 }
 
 public function respondToBadRequest (http:Response res, string msg) {
+    log:printError(msg);
     res.setStatusCode(400);
     RequestError err = {errorMessage:msg};
     var resPayload, _ = <json>err;

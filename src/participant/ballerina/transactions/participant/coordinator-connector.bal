@@ -18,8 +18,13 @@ public connector TransactionClient () {
         req.setJsonPayload(j);
         var res, e = coordinatorEP.post("", req);
         if (e == null) {
-            http:Response r = (http:Response)res;
-            jsonRes = r.getJsonPayload();
+            int statusCode = res.getStatusCode();
+            if (statusCode == 200) {
+                jsonRes = res.getJsonPayload();
+            } else {
+                var errMsg, _ = (string) res.getJsonPayload().errorMessage;
+                err = {msg:errMsg};
+            }
         } else {
             err = (error)e;
         }

@@ -40,10 +40,7 @@ service<http> twoPcCoordinator {
 
         var commitReq, e = <CommitRequest>req.getJsonPayload();
         if (e != null) {
-            res.setStatusCode(400);
-            RequestError err = {errorMessage:"Bad Request"};
-            var resPayload, _ = <json>err;
-            res.setJsonPayload(resPayload);
+            respondToBadRequest(res, "Malformed request");
         } else {
             string txnId = commitReq.transactionId;
             var txn, _ = (TwoPhaseCommitTransaction)transactions[txnId];
@@ -52,10 +49,16 @@ service<http> twoPcCoordinator {
             } else {
                 log:printInfo("Committing transaction: " + txnId);
                 // return response to the initiator. ( Committed | Aborted | Mixed )
-                string msg = twoPhaseCommit(txn);
-                CommitResponse commitRes = {message:msg};
-                var resPayload, _ = <json>commitRes;
-                res.setJsonPayload(resPayload);
+                var msg, err = twoPhaseCommit(txn);
+                if (err == null) {
+                    CommitResponse commitRes = {message:msg};
+                    var resPayload, _ = <json>commitRes;
+                    res.setJsonPayload(resPayload);
+                } else {
+                    res.setStatusCode(500); //TODO: Not sure about this status code
+                    var resPayload, _ = <json>err;
+                    res.setJsonPayload(resPayload);
+                }
                 transactions.remove(txnId);
             }
         }
@@ -79,10 +82,17 @@ service<http> twoPcCoordinator {
                 respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
             } else {
                 log:printInfo("Aborting transaction: " + txnId);
-                string msg = notifyAll(txn, "abort");
-                AbortResponse abortRes = {message:msg};
-                var resPayload, _ = <json>abortRes;
-                res.setJsonPayload(resPayload);
+                // return response to the initiator. ( Aborted | Mixed )
+                var msg, err = notifyAbort(txn);
+                if (err == null) {
+                    AbortResponse abortRes = {message:msg};
+                    var resPayload, _ = <json>abortRes;
+                    res.setJsonPayload(resPayload);
+                } else {
+                    res.setStatusCode(500); //TODO: Not sure about this status code
+                    var resPayload, _ = <json>err;
+                    res.setJsonPayload(resPayload);
+                }
                 transactions.remove(txnId);
             }
         }
