@@ -56,28 +56,9 @@ struct AbortResponse {
 
 function twoPhaseCommit (TwoPhaseCommitTransaction txn) returns (string message, error err) {
     log:printInfo("Running 2-phase commit for transaction: " + txn.transactionId);
-    map participants = txn.participants;
-    any[] p = participants.values();
-    string[] volatileEndpoints = [];
-    string[] durableEndpoints = [];
-    int i = 0;
-    while (i < lengthof p) {
-        var participant, _ = (Participant)p[i];
-        Protocol[] protocols = participant.participantProtocols;
-        if (protocols != null) {
-            int j = 0;
-            while (j < lengthof protocols) {
-                Protocol proto = protocols[j];
-                if (proto.name == PROTOCOL_VOLATILE) {
-                    volatileEndpoints[lengthof volatileEndpoints] = proto.url;
-                } else if (proto.name == PROTOCOL_DURABLE) {
-                    durableEndpoints[lengthof durableEndpoints] = proto.url;
-                }
-                j = j + 1;
-            }
-        }
-        i = i + 1;
-    }
+
+    var volatileEndpoints, durableEndpoints = getVolatileAndDurableEndpoints(txn);
+
     // Prepare phase & commit phase
     // First call prepare on all volatile participants
     boolean prepareSuccessful = prepare(txn, volatileEndpoints);
@@ -127,6 +108,64 @@ function twoPhaseCommit (TwoPhaseCommitTransaction txn) returns (string message,
     return;
 }
 
+function notifyAbort (TwoPhaseCommitTransaction txn) returns (string message, error err) {
+    map participants = txn.participants;
+    string transactionId = txn.transactionId;
+    any[] p = participants.values();
+    int i = 0;
+    message = "aborted";
+    while (i < lengthof p) {
+        var participant, _ = (Participant)p[i];
+        Protocol[] protocols = participant.participantProtocols;
+        if (protocols != null) {
+            int j = 0;
+            while (j < lengthof protocols) {
+                Protocol proto = protocols[j];
+                var status, e = notifyParticipant(transactionId, proto.url, "abort");
+                if (e != null) {
+                    err = {msg:"Hazard-Outcome"};
+                    return;
+                } else if(status == "committed") {
+                    txn.possibleMixedOutcome = true;
+                    message = "mixed";
+                    return;
+                }
+                j = j + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return;
+}
+
+function getVolatileAndDurableEndpoints(TwoPhaseCommitTransaction txn) returns
+                                                                       (string[] volatileEndpoints,
+                                                                        string[] durableEndpoints) {
+    volatileEndpoints = [];
+    durableEndpoints = [];
+    map participants = txn.participants;
+    any[] p = participants.values();
+    int i = 0;
+    while (i < lengthof p) {
+        var participant, _ = (Participant)p[i];
+        Protocol[] protocols = participant.participantProtocols;
+        if (protocols != null) {
+            int j = 0;
+            while (j < lengthof protocols) {
+                Protocol proto = protocols[j];
+                if (proto.name == PROTOCOL_VOLATILE) {
+                    volatileEndpoints[lengthof volatileEndpoints] = proto.url;
+                } else if (proto.name == PROTOCOL_DURABLE) {
+                    durableEndpoints[lengthof durableEndpoints] = proto.url;
+                }
+                j = j + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return;
+}
+
 function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) returns (boolean successful) {
     endpoint<ParticipantClient> participantEP {
     }
@@ -165,36 +204,6 @@ function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) retur
     return;
 }
 
-function notifyAbort (TwoPhaseCommitTransaction txn) returns (string message, error err) {
-    map participants = txn.participants;
-    string transactionId = txn.transactionId;
-    any[] p = participants.values();
-    int i = 0;
-    message = "aborted";
-    while (i < lengthof p) {
-        var participant, _ = (Participant)p[i];
-        Protocol[] protocols = participant.participantProtocols;
-        if (protocols != null) {
-            int j = 0;
-            while (j < lengthof protocols) {
-                Protocol proto = protocols[j];
-                var status, e = notifyParticipant(transactionId, proto.url, "abort"); //TODO: Properly handle status
-                if (e != null) {
-                    err = {msg:"Hazard-Outcome"};
-                    return;
-                } else if(status == "committed") {
-                    txn.possibleMixedOutcome = true;
-                    message = "mixed";
-                    return;
-                }
-                j = j + 1;
-            }
-        }
-        i = i + 1;
-    }
-    return;
-}
-
 function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string message) returns (boolean successful) {
     string transactionId = txn.transactionId;
     int i = 0;
@@ -202,7 +211,7 @@ function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string
     while (i < lengthof participantURLs) {
         string participantURL = participantURLs[i];
         if (participantURL != null) {
-            var status, err = notifyParticipant(transactionId, participantURL, message); //TODO: Properly handle status
+            var _, err = notifyParticipant(transactionId, participantURL, message);
             if (err != null) {
                 successful = false;
                 return;
@@ -220,18 +229,13 @@ function notifyParticipant (string transactionId, string url, string message) re
     bind participantClient with participantEP;
 
     log:printInfo("Notify(" + message + ") participant: " + url);
-
-    // TODO If a participant voted NO then abort
     var status, e = participantEP.notify(transactionId, url, message);
-    print("++++ Error:"); println(e);
-    println("+++++ status:" + status);
 
     error err;
     if (e != null) { // participant may return "Transaction-Unknown", "Not-Prepared" or "Failed-EOT"
         err = e;
     } else if (status == "aborted") {
         log:printInfo("Participant: " + url + " aborted");
-        // TODO: handle this
     } else if (status == "committed") {
         log:printInfo("Participant: " + url + " committed");
     }
