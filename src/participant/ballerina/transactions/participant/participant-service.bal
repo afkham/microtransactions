@@ -22,8 +22,8 @@ service<http> participantService {
             create TransactionClient();
         }
         var updateReq, _ = <UpdateStockQuoteRequest>req.getJsonPayload();
-        string transactionId = req.getHeader("X-XID");
-        string registerAtURL = req.getHeader("X-Register-At-URL");
+        string transactionId = req.getHeader("X-XID").value;
+        string registerAtURL = req.getHeader("X-Register-At-URL").value;
         log:printInfo("Update stock quote request received. Transaction: " + transactionId +
                       ", symbol:" + updateReq.symbol + ", price:" + updateReq.price);
         log:printInfo("Registering for transaction: " + transactionId + " with coordinator: " + registerAtURL);

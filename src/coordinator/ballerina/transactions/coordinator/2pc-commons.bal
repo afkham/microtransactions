@@ -61,11 +61,11 @@ function twoPhaseCommit (TwoPhaseCommitTransaction txn) returns (string message,
 
     // Prepare phase & commit phase
     // First call prepare on all volatile participants
-    boolean prepareSuccessful = prepare(txn, volatileEndpoints);
-    if (prepareSuccessful) {
+    boolean prepareVolatilesSuccessful = prepare(txn, volatileEndpoints);
+    if (prepareVolatilesSuccessful) {
         // if all volatile participants voted YES, Next call prepare on all durable participants
-        prepareSuccessful = prepare(txn, durableEndpoints);
-        if (prepareSuccessful) {
+        boolean prepareDurablesSuccessful = prepare(txn, durableEndpoints);
+        if (prepareDurablesSuccessful) {
             // If all durable participants voted YES (PREPARED or READONLY), next call notify(commit) on all
             // (durable & volatile) participants and return committed to the initiator
             boolean notifyDurablesSuccessful = notify(txn, durableEndpoints, "commit");
