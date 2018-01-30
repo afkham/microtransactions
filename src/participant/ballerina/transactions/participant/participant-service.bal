@@ -1,3 +1,19 @@
+// Copyright (c) 2017 WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+//
+// WSO2 Inc. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package ballerina.transactions.participant;
 
 import ballerina.net.http;
@@ -17,10 +33,11 @@ service<http> participantService {
     map transactions = {};
     map persistentStocks = {};
 
-    resource updateStockQuote (http:Request req, http:Response res) {
+    resource updateStockQuote (http:Connection conn, http:InRequest req) {
         endpoint<TransactionClient> coordinatorEP {
             create TransactionClient();
         }
+        http:OutResponse res;
         var updateReq, _ = <UpdateStockQuoteRequest>req.getJsonPayload();
         string transactionId = req.getHeader("X-XID").value;
         string registerAtURL = req.getHeader("X-Register-At-URL").value;
@@ -39,27 +56,30 @@ service<http> participantService {
             stockCache.put(transactionId, tmpStocks);
 
             json jsonRes = {"message":"updating stock"};
+            res = {statusCode:200};
             res.setJsonPayload(jsonRes);
         } else {
             log:printErrorCause("Cannot register with coordinator for transaction: " + transactionId, e);
-            res.setStatusCode(400);
+            res = {statusCode:400};
             json jsonRes = {"message":"Cannot register for transaction: " + transactionId};
             res.setJsonPayload(jsonRes);
         }
-        _ = res.send();
+        _ = conn.respond(res);
     }
 
-    resource prepare (http:Request req, http:Response res) {
+    resource prepare (http:Connection conn, http:InRequest req) {
+        http:OutResponse res;
         var prepareReq, _ = <PrepareRequest>req.getJsonPayload();
         string transactionId = prepareReq.transactionId;
         log:printInfo("Prepare received for transaction: " + transactionId);
         var txn, _ = (TwoPhaseCommitTransaction)transactions[transactionId];
         if (txn == null) {
-            res.setStatusCode(404);
+            res = {statusCode:404};
             PrepareResponse prepareRes = {message:"Transaction-Unknown"};
             var j, _ = <json>prepareRes;
             res.setJsonPayload(j);
         } else {
+            res = {statusCode:200};
             txn.state = TransactionState.PREPARED;
             //PrepareResponse prepareRes = {message:"read-only"};
             PrepareResponse prepareRes = {message:"prepared"};
@@ -67,37 +87,38 @@ service<http> participantService {
             var j, _ = <json>prepareRes;
             res.setJsonPayload(j);
         }
-        _ = res.send();
+        _ = conn.respond(res);
     }
 
-    resource notify (http:Request req, http:Response res) {
+    resource notify (http:Connection conn, http:InRequest req) {
         var notifyReq, _ = <NotifyRequest>req.getJsonPayload();
         string transactionId = notifyReq.transactionId;
         log:printInfo("Notify(" + notifyReq.message + ") received for transaction: " + transactionId);
+        http:OutResponse res;
 
         NotifyResponse notifyRes;
         var txn, _ = (TwoPhaseCommitTransaction)transactions[transactionId];
         if (txn == null) {
-            res.setStatusCode(404);
+            res = {statusCode:404};
             notifyRes = {message:"Transaction-Unknown"};
         } else {
             if (notifyReq.message == "commit") {
                 if (txn.state != TransactionState.PREPARED) {
-                    res.setStatusCode(400);
+                    res = {statusCode:400};
                     notifyRes = {message:"Not-Prepared"};
                 } else {
+                    res = {statusCode:200};
                     notifyRes = {message:"committed"};
                     var tmpStocks, _ = (map)stockCache.get(transactionId);
                     string[] symbols = tmpStocks.keys();
-                    int i = 0;
-                    while (i < lengthof symbols) {
-                        persistentStocks[symbols[i]] = tmpStocks[symbols[i]];
-                        i = i + 1;
+                    foreach symbol in symbols {
+                        persistentStocks[symbol] = tmpStocks[symbol];
                     }
                     println(persistentStocks);
                     log:printInfo("Persisted all stocks");
                 }
             } else if (notifyReq.message == "abort") {
+                res = {statusCode:200};
                 notifyRes = {message:"aborted"};
                 stockCache.remove(transactionId);
             }
@@ -105,11 +126,12 @@ service<http> participantService {
         }
         var j, _ = <json>notifyRes;
         res.setJsonPayload(j);
-        _ = res.send();
+        _ = conn.respond(res);
     }
 
-    resource abortTransaction (http:Request req, http:Response res) {
+    resource abortTransaction (http:Connection conn, http:InRequest req) {
         // TODO impl
-        _ = res.send();
+        http:OutResponse res = {};
+        _ = conn.respond(res);
     }
 }

@@ -1,3 +1,19 @@
+// Copyright (c) 2017 WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+//
+// WSO2 Inc. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
@@ -29,19 +45,20 @@ service<http> manager {
     @http:resourceConfig {
         path:"/createContext"
     }
-    resource createContext (http:Request req, http:Response res) {
+    resource createContext (http:Connection conn, http:InRequest req) {
         var ccReq, e = <CreateTransactionContextRequest>req.getJsonPayload();
+        http:OutResponse res;
         if (e != null) {
             log:printErrorCause("Invalid registration request", (error)e);
             println(req.getJsonPayload());
-            res.setStatusCode(400);
+            res = {statusCode:400};
             RequestError err = {errorMessage:"Bad Request"};
             var resPayload, _ = <json>err;
             res.setJsonPayload(resPayload);
         } else {
             string coordinationType = ccReq.coordinationType;
             if (!isValidCoordinationType(coordinationType)) {
-                res.setStatusCode(422);
+                res = {statusCode:422};
                 RequestError err = {errorMessage:"Invalid-Coordination-Type:" + coordinationType};
                 var resPayload, _ = <json>err;
                 res.setJsonPayload(resPayload);
@@ -64,17 +81,21 @@ service<http> manager {
                                                  coordinationType:coordinationType,
                                                  registerAtURL:"http://" + coordinatorHost + ":" + coordinatorPort + basePath + registrationPath};
                 var resPayload, _ = <json>context;
+                res = {statusCode:200};
                 res.setJsonPayload(resPayload);
                 log:printInfo("Created transaction: " + txnId);
             }
         }
-        _ = res.send();
+        var connError = conn.respond(res);
+        if (connError != null) {
+            log:printErrorCause("Sending response for create transaction context request failed", (error)connError);
+        }
     }
 
     @http:resourceConfig {
         path:registrationPath
     }
-    resource register (http:Request req, http:Response res) {
+    resource register (http:Connection conn, http:InRequest req) {
         //register(in: Micro-Transaction-Registration,
         //out: Micro-Transaction-Coordination?,
         //fault: ( Invalid-Protocol |
@@ -103,8 +124,9 @@ service<http> manager {
         // Micro-Transaction-Unknown
 
         var registrationReq, e = <RegistrationRequest>req.getJsonPayload();
+        http:OutResponse res;
         if (e != null) {
-            res.setStatusCode(400);
+            res = {statusCode:400};
             RequestError err = {errorMessage:"Bad Request"};
             var resPayload, _ = <json>err;
             res.setJsonPayload(resPayload);
@@ -114,13 +136,27 @@ service<http> manager {
             var txn, _ = (Transaction)transactions[txnId];
 
             if (txn == null) {
-                respondToBadRequest(res, "Transaction-Unknown. Invalid TID:" + txnId);
+                res = respondToBadRequest("Transaction-Unknown. Invalid TID:" + txnId);
+                var connError = conn.respond(res);
+                if (connError != null) {
+                    log:printErrorCause("Sending response for register request with null transaction ID failed",
+                                        (error)connError);
+                }
             } else if (isRegisteredParticipant(participantId, txn.participants)) { // Already-Registered
-                respondToBadRequest(res,
-                                    "Already-Registered. TID:" + txnId + ",participant ID:" + participantId);
+                res = respondToBadRequest("Already-Registered. TID:" + txnId + ",participant ID:" + participantId);
+                var connError = conn.respond(res);
+                if (connError != null) {
+                    log:printErrorCause("Sending response for register request by already registered participant
+                                         for transaction " + txnId + " failed", (error)connError);
+                }
             } else if (!protocolCompatible(txn.coordinationType,
                                            registrationReq.participantProtocols)) { // Invalid-Protocol
-                respondToBadRequest(res, "Invalid-Protocol. TID:" + txnId + ",participant ID:" + participantId);
+                res = respondToBadRequest("Invalid-Protocol. TID:" + txnId + ",participant ID:" + participantId);
+                var connError = conn.respond(res);
+                if (connError != null) {
+                    log:printErrorCause("Sending response for register request by participant with invalid protocol
+                                         for transaction " + txnId + " failed", (error)connError);
+                }
             } else {
                 Participant participant = {participantId:participantId,
                                               participantProtocols:registrationReq.participantProtocols,
@@ -131,8 +167,7 @@ service<http> manager {
                 Protocol[] participantProtocols = registrationReq.participantProtocols;
                 Protocol[] coordinatorProtocols = [];
                 int i = 0;
-                while (i < lengthof participantProtocols) {
-                    Protocol participantProtocol = participantProtocols[i];
+                foreach participantProtocol in participantProtocols {
                     Protocol coordinatorProtocol =
                     {name:participantProtocol.name,
                         url:"http://" + coordinatorHost + ":" + coordinatorPort + "/protocol/" + participantProtocol.name};
@@ -144,11 +179,17 @@ service<http> manager {
                 RegistrationResponse registrationRes = {transactionId:txnId,
                                                            coordinatorProtocols:coordinatorProtocols};
                 var resPayload, _ = <json>registrationRes;
+                res = {statusCode:200};
                 res.setJsonPayload(resPayload);
-                log:printInfo("Registered participant: " + participantId + " for transaction: " + txnId);
+                var connError = conn.respond(res);
+                if (connError != null) {
+                    log:printErrorCause("Sending response for register request for transaction " + txnId +
+                                        " failed", (error)connError);
+                } else {
+                    log:printInfo("Registered participant: " + participantId + " for transaction: " + txnId);
+                }
             }
             //TODO: Need to handle the  Cannot-Register error case
         }
-        _ = res.send();
     }
 }

@@ -1,3 +1,19 @@
+// Copyright (c) 2017 WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+//
+// WSO2 Inc. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package ballerina.transactions.coordinator;
 
 import ballerina.net.http;
@@ -57,12 +73,10 @@ function isRegisteredParticipant (string participantId, map participants) return
 }
 
 function isValidCoordinationType (string coordinationType) returns (boolean) {
-    int i = 0;
-    while (i < lengthof coordinationTypes) {
-        if (coordinationType == coordinationTypes[i]) {
+    foreach coordType in coordinationTypes {
+        if (coordinationType == coordType) {
             return true;
         }
-        i = i + 1;
     }
     return false;
 }
@@ -70,40 +84,37 @@ function isValidCoordinationType (string coordinationType) returns (boolean) {
 function protocolCompatible (string coordinationType,
                              Protocol[] participantProtocols) returns (boolean participantProtocolIsValid) {
     var validProtocols, _ = (string[])coordinationTypeToProtocolsMap[coordinationType];
-    int i = 0;
-    while (i < lengthof participantProtocols) {
-        int j = 0;
-        while (j < lengthof validProtocols) {
-            if (participantProtocols[i].name == validProtocols[j]) {
+    foreach participantProtocol in participantProtocols {
+        foreach validProtocol in validProtocols {
+            if (participantProtocol.name == validProtocol) {
                 participantProtocolIsValid = true;
                 break;
             } else {
                 participantProtocolIsValid = false;
             }
-            j = j + 1;
         }
         if (!participantProtocolIsValid) {
             break;
         }
-        i = i + 1;
     }
     return participantProtocolIsValid;
 }
 
-public function respondToBadRequest (http:Response res, string msg) {
+public function respondToBadRequest (string msg) returns (http:OutResponse res) {
     log:printError(msg);
-    res.setStatusCode(400);
+    res = {statusCode:400};
     RequestError err = {errorMessage:msg};
     var resPayload, _ = <json>err;
     res.setJsonPayload(resPayload);
+    return;
 }
 
-function createTransaction(string coordinationType) returns (Transaction txn) {
-    if(coordinationType == TWO_PHASE_COMMIT) {
-        TwoPhaseCommitTransaction twopcTxn = {transactionId: util:uuid(), coordinationType: TWO_PHASE_COMMIT};
-        txn = (Transaction) twopcTxn;
+function createTransaction (string coordinationType) returns (Transaction txn) {
+    if (coordinationType == TWO_PHASE_COMMIT) {
+        TwoPhaseCommitTransaction twopcTxn = {transactionId:util:uuid(), coordinationType:TWO_PHASE_COMMIT};
+        txn = (Transaction)twopcTxn;
     } else {
-        error e = {msg: "Unknown coordination type: " + coordinationType};
+        error e = {msg:"Unknown coordination type: " + coordinationType};
         throw e;
     }
     return;

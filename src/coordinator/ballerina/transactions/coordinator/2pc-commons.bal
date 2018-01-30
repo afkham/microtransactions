@@ -1,3 +1,19 @@
+// Copyright (c) 2017 WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+//
+// WSO2 Inc. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package ballerina.transactions.coordinator;
 import ballerina.log;
 
@@ -111,57 +127,45 @@ function twoPhaseCommit (TwoPhaseCommitTransaction txn) returns (string message,
 function notifyAbort (TwoPhaseCommitTransaction txn) returns (string message, error err) {
     map participants = txn.participants;
     string transactionId = txn.transactionId;
-    any[] p = participants.values();
-    int i = 0;
     message = "aborted";
-    while (i < lengthof p) {
-        var participant, _ = (Participant)p[i];
+    foreach _, p in participants {
+        var participant, _ = (Participant)p;
         Protocol[] protocols = participant.participantProtocols;
         if (protocols != null) {
-            int j = 0;
-            while (j < lengthof protocols) {
-                Protocol proto = protocols[j];
+            foreach proto in protocols {
                 var status, e = notifyParticipant(transactionId, proto.url, "abort");
                 if (e != null) {
                     err = {msg:"Hazard-Outcome"};
                     return;
-                } else if(status == "committed") {
+                } else if (status == "committed") {
                     txn.possibleMixedOutcome = true;
                     message = "mixed";
                     return;
                 }
-                j = j + 1;
             }
         }
-        i = i + 1;
     }
     return;
 }
 
-function getVolatileAndDurableEndpoints(TwoPhaseCommitTransaction txn) returns
-                                                                       (string[] volatileEndpoints,
-                                                                        string[] durableEndpoints) {
+function getVolatileAndDurableEndpoints (TwoPhaseCommitTransaction txn) returns
+                                                                        (string[] volatileEndpoints,
+                                                                         string[] durableEndpoints) {
     volatileEndpoints = [];
     durableEndpoints = [];
     map participants = txn.participants;
-    any[] p = participants.values();
-    int i = 0;
-    while (i < lengthof p) {
-        var participant, _ = (Participant)p[i];
+    foreach _, p in participants {
+        var participant, _ = (Participant)p;
         Protocol[] protocols = participant.participantProtocols;
         if (protocols != null) {
-            int j = 0;
-            while (j < lengthof protocols) {
-                Protocol proto = protocols[j];
+            foreach proto in protocols {
                 if (proto.name == PROTOCOL_VOLATILE) {
                     volatileEndpoints[lengthof volatileEndpoints] = proto.url;
                 } else if (proto.name == PROTOCOL_DURABLE) {
                     durableEndpoints[lengthof durableEndpoints] = proto.url;
                 }
-                j = j + 1;
             }
         }
-        i = i + 1;
     }
     return;
 }
@@ -173,43 +177,39 @@ function prepare (TwoPhaseCommitTransaction txn, string[] participantURLs) retur
     // Let's set this to true and change it to false only if a participant aborted or an error occurred while trying
     // to prepare a participant
     successful = true;
-    int i = 0;
-    while (i < lengthof participantURLs) {
+    foreach participantURL in participantURLs {
         ParticipantClient participantClient = create ParticipantClient();
         bind participantClient with participantEP;
 
-        log:printInfo("Preparing participant: " + participantURLs[i]);
+        log:printInfo("Preparing participant: " + participantURL);
         // If a participant voted NO then abort
-        var status, e = participantEP.prepare(transactionId, participantURLs[i]);
+        var status, e = participantEP.prepare(transactionId, participantURL);
         if (e != null || status == "aborted") {
-            log:printInfo("Participant: " + participantURLs[i] + " failed or aborted");
+            log:printInfo("Participant: " + participantURL + " failed or aborted");
             successful = false;
-            break;
+            return;
         } else if (status == "committed") {
-            log:printInfo("Participant: " + participantURLs[i] + " committed");
+            log:printInfo("Participant: " + participantURL + " committed");
             // If one or more participants returns "committed" and the overall prepare fails, we have to
             // report a mixed-outcome to the initiator
             txn.possibleMixedOutcome = true;
             // Don't send notify to this participant because it is has already committed. We can forget about this participant.
-            participantURLs[i] = null; //TODO: Nulling this out because there is no way to remove an element from an array
+            participantURL = null; //TODO: Nulling this out because there is no way to remove an element from an array
         } else if (status == "read-only") {
-            log:printInfo("Participant: " + participantURLs[i] + " read-only");
+            log:printInfo("Participant: " + participantURL + " read-only");
             // Don't send notify to this participant because it is read-only. We can forget about this participant.
-            participantURLs[i] = null; //TODO: Nulling this out because there is no way to remove an element from an array
+            participantURL = null; //TODO: Nulling this out because there is no way to remove an element from an array
         } else {
-            log:printInfo("Participant: " + participantURLs[i] + ", status: " + status);
+            log:printInfo("Participant: " + participantURL + ", status: " + status);
         }
-        i = i + 1;
     }
     return;
 }
 
 function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string message) returns (boolean successful) {
     string transactionId = txn.transactionId;
-    int i = 0;
     successful = true;
-    while (i < lengthof participantURLs) {
-        string participantURL = participantURLs[i];
+    foreach participantURL in participantURLs {
         if (participantURL != null) {
             var _, err = notifyParticipant(transactionId, participantURL, message);
             if (err != null) {
@@ -217,7 +217,6 @@ function notify (TwoPhaseCommitTransaction txn, string[] participantURLs, string
                 return;
             }
         }
-        i = i + 1;
     }
     return;
 }
