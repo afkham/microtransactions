@@ -52,7 +52,9 @@ public connector ParticipantClient () {
     }
 
     action notify (string transactionId, string participantURL, string message) returns
-                                                                                (string status, error err) {
+                                                                                (string status,
+                                                                                 error participantErr,
+                                                                                 error communicationErr) {
         endpoint<http:HttpClient> participantEP {
             create http:HttpClient(participantURL, {});
         }
@@ -60,8 +62,8 @@ public connector ParticipantClient () {
         NotifyRequest notifyReq = {transactionId:transactionId, message:message};
         var j, _ = <json>notifyReq;
         req.setJsonPayload(j);
-        var res, communicationErr = participantEP.post("/notify", req);
-        if (communicationErr == null) {
+        var res, commErr = participantEP.post("/notify", req);
+        if (commErr == null) {
             var notifyRes, transformErr = <NotifyResponse>res.getJsonPayload();
             if (transformErr == null) {
                 int statusCode = res.getStatusCode();
@@ -70,20 +72,20 @@ public connector ParticipantClient () {
                     if (transformErr == null) {
                         status = msg;
                     } else {
-                        err = (error)transformErr;
+                        participantErr = (error)transformErr;
                     }
                 } else if ((statusCode == 400 && msg == "Not-Prepared") ||
                            (statusCode == 404 && msg == "Transaction-Unknown") ||
                            (statusCode == 500 && msg == "Failed-EOT")) {
-                    err = {msg:msg};
+                    participantErr = {msg:msg};
                 } else {
-                    err = {msg:"Notify failed. Transaction: " + transactionId + ", Participant: " + participantURL};
+                    participantErr = {msg:"Notify failed. Transaction: " + transactionId + ", Participant: " + participantURL};
                 }
             } else {
-                err = (error)transformErr;
+                communicationErr = (error)transformErr;
             }
         } else {
-            err = (error)communicationErr;
+            communicationErr = (error)commErr;
         }
         return;
     }

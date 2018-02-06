@@ -19,7 +19,7 @@ package ballerina.transactions.initiator;
 import ballerina.net.http;
 import ballerina.config;
 
-public connector TransactionClient () {
+public connector CoordinatorClient () {
 
     action createContext (CreateTransactionContextRequest ctcReq) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> coordinatorEP {
@@ -40,7 +40,7 @@ public connector TransactionClient () {
 
     action commitTransaction (CommitRequest commitReq) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> coordinatorEP {
-            create http:HttpClient("http://localhost:9999/2pc/commit", {});
+            create http:HttpClient("http://localhost:9999/2pc/commit", {endpointTimeout:15000});
         }
         var j, _ = <json>commitReq;
         http:OutRequest req = {};

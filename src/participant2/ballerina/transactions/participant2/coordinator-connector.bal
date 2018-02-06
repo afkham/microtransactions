@@ -14,11 +14,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package ballerina.transactions.participant;
+package ballerina.transactions.participant2;
 
 import ballerina.net.http;
 
-public connector CoordinatorClient () {
+public connector TransactionClient () {
 
     action register (string transactionId, string participantId, string registerAtURL) returns
                                                                                        (json jsonRes, error err) {
@@ -41,22 +41,6 @@ public connector CoordinatorClient () {
                 var errMsg, _ = (string)res.getJsonPayload().errorMessage;
                 err = {msg:errMsg};
             }
-        } else {
-            err = (error)e;
-        }
-        return;
-    }
-
-    action abortTransaction (AbortRequest abortReq) returns (json jsonRes, error err) {
-        endpoint<http:HttpClient> coordinatorEP {
-            create http:HttpClient("http://localhost:9999/2pc/abort", {});
-        }
-        var j, _ = <json>abortReq;
-        http:OutRequest req = {};
-        req.setJsonPayload(j);
-        var res, e = coordinatorEP.post("", req);
-        if (e == null) {
-            jsonRes = res.getJsonPayload();
         } else {
             err = (error)e;
         }

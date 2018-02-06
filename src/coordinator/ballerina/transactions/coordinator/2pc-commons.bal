@@ -228,11 +228,18 @@ function notifyParticipant (string transactionId, string url, string message) re
     bind participantClient with participantEP;
 
     log:printInfo("Notify(" + message + ") participant: " + url);
-    var status, e = participantEP.notify(transactionId, url, message);
+    var status, participantErr, communicationErr = participantEP.notify(transactionId, url, message);
 
     error err;
-    if (e != null) { // participant may return "Transaction-Unknown", "Not-Prepared" or "Failed-EOT"
-        err = e;
+    if (communicationErr != null) {
+        if (message != "abort") {
+            err = communicationErr;
+        }
+        log:printErrorCause("Communication error occurred while notify(" + message + ") participant: " + url +
+                            " for transaction: " + transactionId, communicationErr);
+    } else if (participantErr != null) { // participant may return "Transaction-Unknown", "Not-Prepared" or "Failed-EOT"
+        log:printErrorCause("Participant replied with an error", participantErr);
+        err = participantErr;
     } else if (status == "aborted") {
         log:printInfo("Participant: " + url + " aborted");
     } else if (status == "committed") {

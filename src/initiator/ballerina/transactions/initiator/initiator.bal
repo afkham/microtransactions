@@ -24,10 +24,12 @@ public function main (string[] args) {
 
     json txnContext = beginTransaction();
 
-    callBusinessService(txnContext);
-    _ = commitTransaction(txnContext);
-
-    //_ = abortTransaction(txnContext);
+    boolean successful = callBusinessService(txnContext);
+    if (successful) {
+        _ = commitTransaction(txnContext);
+    } else {
+        _ = abortTransaction(txnContext);
+    }
     //sleep(1000);
 }
 
@@ -58,8 +60,8 @@ struct AbortResponse {
 }
 
 function beginTransaction () returns (json) {
-    endpoint<TransactionClient> coordinatorEP {
-        create TransactionClient();
+    endpoint<CoordinatorClient> coordinatorEP {
+        create CoordinatorClient();
     }
     CreateTransactionContextRequest ctcReq = {participantId:util:uuid(), coordinationType:"2pc"};
     var j, e = coordinatorEP.createContext(ctcReq);
@@ -68,7 +70,7 @@ function beginTransaction () returns (json) {
     return j;
 }
 
-function callBusinessService (json txnContext) {
+function callBusinessService (json txnContext) returns (boolean successful) {
     endpoint<BizClient> participantEP {
         create BizClient();
     }
@@ -77,16 +79,26 @@ function callBusinessService (json txnContext) {
 
     float price = math:randomInRange(200, 250) + math:random();
     UpdateStockQuoteRequest bizReq = {symbol:"GOOG", price:price};
-    var j, e = participantEP.call(txnId, regURL, bizReq, "127.0.0.1", 8888);
-    j, e = participantEP.call(txnId, regURL, bizReq, "127.0.0.1", 8889);
+    var j, e = participantEP.updateStock(txnId, regURL, bizReq, "127.0.0.1", 8888);
+    if (e != null) {
+        successful = false;
+        return;
+    }
+    j, e = participantEP.updateStock(txnId, regURL, bizReq, "127.0.0.1", 8889);
+    if (e != null) {
+        successful = false;
+        return;
+    }
     println(e);
     println(j);
+    return true;
 }
 
 function commitTransaction (json txnContext) returns (json) {
-    endpoint<TransactionClient> coordinatorEP {
-        create TransactionClient();
+    endpoint<CoordinatorClient> coordinatorEP {
+        create CoordinatorClient();
     }
+    println("Committing transaction...");
     var txnId, _ = (string)txnContext["transactionId"];
     CommitRequest commitReq = {transactionId:txnId};
     var j, e = coordinatorEP.commitTransaction(commitReq);
@@ -96,9 +108,10 @@ function commitTransaction (json txnContext) returns (json) {
 }
 
 function abortTransaction (json txnContext) returns (json) {
-    endpoint<TransactionClient> coordinatorEP {
-        create TransactionClient();
+    endpoint<CoordinatorClient> coordinatorEP {
+        create CoordinatorClient();
     }
+    println("Aborting transaction...");
     var txnId, _ = (string)txnContext["transactionId"];
     AbortRequest abortReq = {transactionId:txnId};
     var j, e = coordinatorEP.abortTransaction(abortReq);

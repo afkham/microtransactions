@@ -26,7 +26,7 @@ import ballerina.caching;
     host:participantHost,
     port:participantPort
 }
-service<http> participantService {
+service<http> stockquoteService {
     string participantId = util:uuid();
 
     caching:Cache stockCache = caching:createCache("stocks", 30000, 10, 0.25);
@@ -34,8 +34,11 @@ service<http> participantService {
     map persistentStocks = {};
 
     resource updateStockQuote (http:Connection conn, http:InRequest req) {
-        endpoint<TransactionClient> coordinatorEP {
-            create TransactionClient();
+        endpoint<CoordinatorClient> coordinatorEP {
+            create CoordinatorClient();
+        }
+        endpoint<BizClient> participantEP {
+            create BizClient();
         }
         http:OutResponse res;
         var updateReq, _ = <UpdateStockQuoteRequest>req.getJsonPayload();
@@ -43,27 +46,48 @@ service<http> participantService {
         string registerAtURL = req.getHeader("X-Register-At-URL").value;
         log:printInfo("Update stock quote request received. Transaction: " + transactionId +
                       ", symbol:" + updateReq.symbol + ", price:" + updateReq.price);
-        log:printInfo("Registering for transaction: " + transactionId + " with coordinator: " + registerAtURL);
-        var j, e = coordinatorEP.register(transactionId, participantId, registerAtURL);
-        println(j);
-        if (e == null) {
+
+        // Register with the coordinator only if you have not already done so
+        if (transactions[transactionId] == null) {
+            log:printInfo("Registering for transaction: " + transactionId + " with coordinator: " + registerAtURL);
+            var j, e = coordinatorEP.register(transactionId, participantId, registerAtURL);
+            println(j);
+            if (e != null) {
+                log:printErrorCause("Cannot register with coordinator for transaction: " + transactionId, e);
+                res = {statusCode:400};
+                json jsonRes = {"message":"Cannot register for transaction: " + transactionId};
+                res.setJsonPayload(jsonRes);
+                _ = conn.respond(res);
+                return;
+            }
             log:printInfo("Registered with coordinator for transaction: " + transactionId);
-
-            TwoPhaseCommitTransaction txn = {transactionId:transactionId, state:TransactionState.ACTIVE};
-            transactions[transactionId] = txn;
-            map tmpStocks = {};
-            tmpStocks[updateReq.symbol] = updateReq.price;
-            stockCache.put(transactionId, tmpStocks);
-
-            json jsonRes = {"message":"updating stock"};
-            res = {statusCode:200};
-            res.setJsonPayload(jsonRes);
-        } else {
-            log:printErrorCause("Cannot register with coordinator for transaction: " + transactionId, e);
-            res = {statusCode:400};
-            json jsonRes = {"message":"Cannot register for transaction: " + transactionId};
-            res.setJsonPayload(jsonRes);
         }
+
+        sleep(5000);
+        // Update local data
+        TwoPhaseCommitTransaction txn = {transactionId:transactionId, state:TransactionState.ACTIVE};
+        transactions[transactionId] = txn;
+        map tmpStocks = {};
+        tmpStocks[updateReq.symbol] = updateReq.price;
+        stockCache.put(transactionId, tmpStocks);
+
+        // Call another participant
+        if (getParticipantPort() != 10000) {
+            var j, err = participantEP.updateStock(transactionId, registerAtURL, updateReq, "localhost", 10000);
+            if (err != null) {
+                j, err = coordinatorEP.abortTransaction({transactionId:transactionId});
+
+                json jsonRes = {"message":"Could not call participant"};
+                res = {statusCode:500};
+                res.setJsonPayload(jsonRes);
+                _ = conn.respond(res);
+                return;
+            }
+        }
+
+        json jsonRes = {"message":"updating stock"};
+        res = {statusCode:200};
+        res.setJsonPayload(jsonRes);
         _ = conn.respond(res);
     }
 

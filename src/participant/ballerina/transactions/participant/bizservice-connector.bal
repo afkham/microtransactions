@@ -14,13 +14,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package ballerina.transactions.initiator;
+package ballerina.transactions.participant;
 import ballerina.net.http;
 
 public connector BizClient () {
 
     action updateStock (string transactionId, string registerAtUrl, UpdateStockQuoteRequest bizReq,
-                        string host, int port) returns (json jsonRes, error err) {
+                 string host, int port) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> bizEP {
             create http:HttpClient("http://" + host + ":" + port + "/updateStockQuote", {});
         }
@@ -30,13 +30,9 @@ public connector BizClient () {
         req.setHeader("X-Register-At-URL", registerAtUrl);
         req.setJsonPayload(j);
         var res, e = bizEP.post("", req);
-        println("Got response from bizservice");
         if (e == null) {
-            if (res.statusCode != 200) {
-                err = {msg:"Error occurred"};
-            } else {
-                jsonRes = res.getJsonPayload();
-            }
+            http:InResponse r = (http:InResponse)res;
+            jsonRes = r.getJsonPayload();
         } else {
             err = (error)e;
         }
