@@ -70,3 +70,30 @@ function callBusinessService (string txnId, string regAtURL) returns (boolean su
     println(j);
     return;
 }
+
+public connector BizClient () {
+
+    action updateStock (string transactionId, string registerAtUrl, UpdateStockQuoteRequest bizReq,
+                        string host, int port) returns (json jsonRes, error err) {
+        endpoint<http:HttpClient> bizEP {
+            create http:HttpClient("http://" + host + ":" + port + "/stockquote/update", {});
+        }
+        var j, _ = <json>bizReq;
+        http:OutRequest req = {};
+        req.setHeader("X-XID", transactionId);
+        req.setHeader("X-Register-At-URL", registerAtUrl);
+        req.setJsonPayload(j);
+        var res, e = bizEP.post("", req);
+        println("Got response from bizservice");
+        if (e == null) {
+            if (res.statusCode != 200) {
+                err = {msg:"Error occurred"};
+            } else {
+                jsonRes = res.getJsonPayload();
+            }
+        } else {
+            err = (error)e;
+        }
+        return;
+    }
+}

@@ -21,6 +21,7 @@ import ballerina.transactions.coordinator;
 import ballerina.log;
 import ballerina.net.http;
 import ballerina.util;
+import ballerina.config;
 
 @http:configuration {
     basePath:"/stockquote",
@@ -37,9 +38,7 @@ service<http> stockquoteService {
         path:"/update"
     }
     resource updateStockQuote (http:Connection conn, http:InRequest req) {
-        endpoint<BizClient> participantEP {
-            create BizClient();
-        }
+
         println("Received update stockquote request");
         http:OutResponse res;
         var updateReq, _ = <UpdateStockQuoteRequest>req.getJsonPayload();
@@ -85,4 +84,25 @@ service<http> stockquoteService {
 struct UpdateStockQuoteRequest {
     string symbol;
     float price;
+}
+
+const string participantHost = getParticipantHost();
+const int participantPort = getParticipantPort();
+
+function getParticipantHost () returns (string host) {
+    host = config:getInstanceValue("http", "participant.host");
+    if (host == "") {
+        host = "localhost";
+    }
+    return;
+}
+
+function getParticipantPort () returns (int port) {
+    var p, e = <int>config:getInstanceValue("http", "participant.port");
+    if (e != null) {
+        port = 8081;
+    } else {
+        port = p;
+    }
+    return;
 }
