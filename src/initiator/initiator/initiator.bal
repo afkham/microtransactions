@@ -18,6 +18,7 @@ package initiator;
 
 import ballerina.math;
 import ballerina.net.http;
+import ballerina.log;
 import ballerina.transactions.coordinator;
 
 @http:configuration {
@@ -32,13 +33,10 @@ service<http> InitiatorService {
         path:"/"
     }
     resource init (http:Connection conn, http:InRequest req) {
-        println("Initiating transaction...");
-        //coordinator:TransactionContext txnCtx = coordinator:beginTransaction(null, null, "2pc");
-        var txnCtx, beginTxnErr = coordinator:beginTransaction(null, null, "2pc");
-        println("Started transaction:" + txnCtx.transactionId);
-        boolean successful = callBusinessService(txnCtx.transactionId, txnCtx.registerAtURL);
-
-        var msg, endTxnErr = coordinator:endTransaction(txnCtx.transactionId);
+        log:printInfo("Initiating transaction...");
+        transaction {
+            boolean successful = callBusinessService();
+        }
 
         http:OutResponse res = {statusCode:200};
         _ = conn.respond(res);
@@ -50,14 +48,14 @@ struct UpdateStockQuoteRequest {
     float price;
 }
 
-function callBusinessService (string txnId, string regAtURL) returns (boolean successful) {
+function callBusinessService () returns (boolean successful) {
     endpoint<BizClient> participantEP {
         create BizClient();
     }
 
     float price = math:randomInRange(200, 250) + math:random();
     UpdateStockQuoteRequest bizReq = {symbol:"GOOG", price:price};
-    var j, e = participantEP.updateStock(txnId, regAtURL, bizReq, "127.0.0.1", 8889);
+    var j, e = participantEP.updateStock(bizReq, "127.0.0.1", 8889);
     if (e != null) {
         successful = false;
     }
@@ -66,28 +64,26 @@ function callBusinessService (string txnId, string regAtURL) returns (boolean su
     //    successful = false;
     //    return;
     //}
-    println(e);
-    println(j);
+    //log:printErrorCause("", e);
+    //log:printInfo(j);
     return;
 }
 
 public connector BizClient () {
 
-    action updateStock (string transactionId, string registerAtUrl, UpdateStockQuoteRequest bizReq,
+    action updateStock (UpdateStockQuoteRequest bizReq,
                         string host, int port) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> bizEP {
             create http:HttpClient("http://" + host + ":" + port + "/stockquote/update", {});
         }
         var j, _ = <json>bizReq;
         http:OutRequest req = {};
-        req.setHeader("X-XID", transactionId);
-        req.setHeader("X-Register-At-URL", registerAtUrl);
         req.setJsonPayload(j);
         var res, e = bizEP.post("", req);
-        println("Got response from bizservice");
+        log:printInfo("Got response from bizservice");
         if (e == null) {
             if (res.statusCode != 200) {
-                err = {msg:"Error occurred"};
+                err = {message:"Error occurred"};
             } else {
                 jsonRes = res.getJsonPayload();
             }

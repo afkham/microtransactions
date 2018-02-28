@@ -17,11 +17,12 @@
 package participant;
 
 import ballerina.caching;
-import ballerina.transactions.coordinator;
+import ballerina.config;
 import ballerina.log;
 import ballerina.net.http;
 import ballerina.util;
-import ballerina.config;
+import ballerina.io;
+import ballerina.transactions.coordinator;
 
 @http:configuration {
     basePath:"/stockquote",
@@ -38,41 +39,13 @@ service<http> stockquoteService {
         path:"/update"
     }
     resource updateStockQuote (http:Connection conn, http:InRequest req) {
-
-        println("Received update stockquote request");
         http:OutResponse res;
-        var updateReq, _ = <UpdateStockQuoteRequest>req.getJsonPayload();
-        string transactionId = req.getHeader("X-XID");
-        string registerAtURL = req.getHeader("X-Register-At-URL");
-
-        var txnCtx, err = coordinator:beginTransaction(transactionId, registerAtURL, "2pc");
-        println("Registered for transaction:" + txnCtx.transactionId);
-        log:printInfo("Update stock quote request received. Transaction: " + transactionId +
-                      ", symbol:" + updateReq.symbol + ", price:" + updateReq.price);
-
-        var msg, endTxnErr = coordinator:endTransaction(txnCtx.transactionId);
-
-        //sleep(5000);
-        //// Update local data
-        //TwoPhaseCommitTransaction txn = {transactionId:transactionId, state:TransactionState.ACTIVE};
-        //transactions[transactionId] = txn;
-        //map tmpStocks = {};
-        //tmpStocks[updateReq.symbol] = updateReq.price;
-        //stockCache.put(transactionId, tmpStocks);
-        //
-        //// Call another participant
-        //if (getParticipantPort() != 10000) {
-        //    var j, err = participantEP.updateStock(transactionId, registerAtURL, updateReq, "localhost", 10000);
-        //    if (err != null) {
-        //        j, err = coordinatorEP.abortTransaction({transactionId:transactionId});
-        //
-        //        json jsonRes = {"message":"Could not call participant"};
-        //        res = {statusCode:500};
-        //        res.setJsonPayload(jsonRes);
-        //        _ = conn.respond(res);
-        //        return;
-        //    }
-        //}
+        transaction {
+            log:printInfo("Received update stockquote request");
+            var updateReq, _ = <UpdateStockQuoteRequest>req.getJsonPayload();
+            log:printInfo("Update stock quote request received. symbol:" + updateReq.symbol +
+                          ", price:" + updateReq.price);
+        }
 
         json jsonRes = {"message":"updating stock"};
         res = {statusCode:200};
