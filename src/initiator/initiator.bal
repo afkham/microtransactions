@@ -21,6 +21,8 @@ service<http> InitiatorService {
         transaction {
             boolean successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update", "IBM");
             successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update2", "GOOG");
+            successful = callBusinessService("http://" + host + ":" + port + "/stockquote2/update", "AMZN");
+            successful = callBusinessService("http://" + host + ":" + port + "/stockquote2/update2", "MSFT");
             if (successful) {
                 res = {statusCode:200};
             } else {
