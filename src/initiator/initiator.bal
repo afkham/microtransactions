@@ -9,6 +9,10 @@ import ballerina.log;
 }
 service<http> InitiatorService {
 
+    string host = "127.0.0.1";
+    int port = 8889;
+    BizClient client = create BizClient("http://" + host + ":" + port);
+
     @http:resourceConfig {
         methods:["GET"],
         path:"/"
@@ -16,13 +20,12 @@ service<http> InitiatorService {
     resource init (http:Connection conn, http:InRequest req) {
         http:OutResponse res;
         log:printInfo("Initiating transaction...");
-        string host = "127.0.0.1";
-        int port = 8889;
+
         transaction {
-            boolean successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update", "IBM");
-            successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update2", "GOOG");
-            successful = callBusinessService("http://" + host + ":" + port + "/stockquote2/update", "AMZN");
-            successful = callBusinessService("http://" + host + ":" + port + "/stockquote2/update2", "MSFT");
+            boolean successful = callBusinessService(client, "/stockquote/update", "IBM");
+            successful = callBusinessService(client, "/stockquote/update2", "GOOG");
+            successful = callBusinessService(client, "/stockquote2/update", "AMZN");
+            successful = callBusinessService(client, "/stockquote2/update2", "MSFT");
             if (successful) {
                 res = {statusCode:200};
             } else {
@@ -38,14 +41,13 @@ service<http> InitiatorService {
     }
 }
 
-function callBusinessService (string url, string symbol) returns (boolean successful) {
+function callBusinessService (BizClient client, string pathSegment, string symbol) returns (boolean successful) {
     endpoint<BizClient> participantEP {
-        create BizClient(url);
+        client;
     }
-
     float price = math:randomInRange(200, 250) + math:random();
     json bizReq = {symbol:symbol, price:price};
-    var _, e = participantEP.updateStock(bizReq);
+    var _, e = participantEP.updateStock(pathSegment, bizReq);
     if (e != null) {
         successful = false;
     } else {
@@ -55,14 +57,13 @@ function callBusinessService (string url, string symbol) returns (boolean succes
 }
 
 public connector BizClient (string url) {
-
-    action updateStock (json bizReq) returns (json jsonRes, error err) {
-        endpoint<http:HttpClient> bizEP {
-            create http:HttpClient(url, {});
-        }
+    endpoint<http:HttpClient> bizEP {
+        create http:HttpClient(url, {});
+    }
+    action updateStock (string pathSegment, json bizReq) returns (json jsonRes, error err) {
         http:OutRequest req = {};
         req.setJsonPayload(bizReq);
-        var res, e = bizEP.post("", req);
+        var res, e = bizEP.post(pathSegment, req);
         log:printInfo("Got response from bizservice");
         if (e == null) {
             if (res.statusCode != 200) {
