@@ -19,8 +19,8 @@ service<http> InitiatorService {
         string host = "127.0.0.1";
         int port = 8889;
         transaction {
-            boolean successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update");
-            successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update2");
+            boolean successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update", "IBM");
+            successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update2", "GOOG");
             if (successful) {
                 res = {statusCode:200};
             } else {
@@ -36,13 +36,13 @@ service<http> InitiatorService {
     }
 }
 
-function callBusinessService (string url) returns (boolean successful) {
+function callBusinessService (string url, string symbol) returns (boolean successful) {
     endpoint<BizClient> participantEP {
         create BizClient(url);
     }
 
     float price = math:randomInRange(200, 250) + math:random();
-    json bizReq = {symbol:"GOOG", price:price};
+    json bizReq = {symbol:symbol, price:price};
     var _, e = participantEP.updateStock(bizReq);
     if (e != null) {
         successful = false;
