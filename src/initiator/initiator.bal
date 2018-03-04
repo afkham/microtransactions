@@ -16,8 +16,11 @@ service<http> InitiatorService {
     resource init (http:Connection conn, http:InRequest req) {
         http:OutResponse res;
         log:printInfo("Initiating transaction...");
+        string host = "127.0.0.1";
+        int port = 8889;
         transaction {
-            boolean successful = callBusinessService();
+            boolean successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update");
+            successful = callBusinessService("http://" + host + ":" + port + "/stockquote/update2");
             if (successful) {
                 res = {statusCode:200};
             } else {
@@ -33,14 +36,14 @@ service<http> InitiatorService {
     }
 }
 
-function callBusinessService () returns (boolean successful) {
+function callBusinessService (string url) returns (boolean successful) {
     endpoint<BizClient> participantEP {
-        create BizClient();
+        create BizClient(url);
     }
 
     float price = math:randomInRange(200, 250) + math:random();
     json bizReq = {symbol:"GOOG", price:price};
-    var _, e = participantEP.updateStock(bizReq, "127.0.0.1", 8889);
+    var _, e = participantEP.updateStock(bizReq);
     if (e != null) {
         successful = false;
     } else {
@@ -49,11 +52,11 @@ function callBusinessService () returns (boolean successful) {
     return;
 }
 
-public connector BizClient () {
+public connector BizClient (string url) {
 
-    action updateStock (json bizReq, string host, int port) returns (json jsonRes, error err) {
+    action updateStock (json bizReq) returns (json jsonRes, error err) {
         endpoint<http:HttpClient> bizEP {
-            create http:HttpClient("http://" + host + ":" + port + "/stockquote/update", {});
+            create http:HttpClient(url, {});
         }
         http:OutRequest req = {};
         req.setJsonPayload(bizReq);
