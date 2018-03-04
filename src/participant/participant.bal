@@ -44,7 +44,6 @@ service<http> stockquoteService {
         log:printInfo("Received update stockquote request2");
         http:OutResponse res;
         transaction {
-            io:println("2nd transaction block");
             json updateReq = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
                                     [updateReq.symbol, updateReq.price]);
