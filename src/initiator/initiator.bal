@@ -33,7 +33,7 @@ service<http> InitiatorService {
                 res = {statusCode:500};
             }
             transaction {
-                log:printInfo("Nested initiator transaction");
+                log:printInfo("Nested participant transaction");
             }
         }
         transaction {
