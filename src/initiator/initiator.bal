@@ -21,7 +21,8 @@ service<http> InitiatorService {
         http:OutResponse res;
         log:printInfo("Initiating transaction...");
 
-        transaction {
+        transaction with retries(4) {
+            log:printInfo("1st initiator transaction");
             boolean successful = callBusinessService(client, "/stockquote/update", "IBM");
             successful = callBusinessService(client, "/stockquote/update2", "GOOG");
             successful = callBusinessService(client, "/stockquote2/update", "AMZN");
@@ -31,6 +32,12 @@ service<http> InitiatorService {
             } else {
                 res = {statusCode:500};
             }
+            transaction {
+                log:printInfo("Nested initiator transaction");
+            }
+        }
+        transaction {
+            log:printInfo("2nd initiator transaction");
         }
         var err = conn.respond(res);
         if (err != null) {
