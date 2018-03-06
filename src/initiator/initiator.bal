@@ -24,13 +24,29 @@ service<http> InitiatorService {
         transaction with retries(4) {
             log:printInfo("1st initiator transaction");
             boolean successful = callBusinessService(client, "/stockquote/update", "IBM");
-            successful = callBusinessService(client, "/stockquote/update2", "GOOG");
-            successful = callBusinessService(client, "/stockquote2/update", "AMZN");
-            successful = callBusinessService(client, "/stockquote2/update2", "MSFT");
-            if (successful) {
-                res = {statusCode:200};
-            } else {
+            if (!successful) {
                 res = {statusCode:500};
+                abort;
+            } else {
+                successful = callBusinessService(client, "/stockquote/update2", "GOOG");
+                if (!successful) {
+                    res = {statusCode:500};
+                    abort;
+                } else {
+                    successful = callBusinessService(client, "/stockquote2/update", "AMZN");
+                    if (!successful) {
+                        res = {statusCode:500};
+                        abort;
+                    } else {
+                        successful = callBusinessService(client, "/stockquote2/update2", "MSFT");
+                        if (!successful) {
+                            res = {statusCode:500};
+                            abort;
+                        } else {
+                            res = {statusCode:200};
+                        }
+                    }
+                }
             }
             transaction {
                 log:printInfo("Nested participant transaction");
