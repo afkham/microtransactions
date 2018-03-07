@@ -20,7 +20,7 @@ service<http> StockquoteService {
         }
         transaction {
             io:println("2nd transaction block");
-            json updateReq = req.getJsonPayload();
+            var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
                                     [updateReq.symbol, updateReq.price]);
             log:printInfo(msg);
@@ -44,7 +44,7 @@ service<http> StockquoteService {
         log:printInfo("Received update stockquote request2");
         http:OutResponse res;
         transaction {
-            json updateReq = req.getJsonPayload();
+            var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
                                     [updateReq.symbol, updateReq.price]);
             log:printInfo(msg);
@@ -80,7 +80,7 @@ service<http> StockquoteService2 {
         }
         transaction {
             io:println("2nd transaction block");
-            json updateReq = req.getJsonPayload();
+            var updateReq, _ = req.getJsonPayload();
             var symbol, _ = (string)updateReq.symbol;
             //if (symbol == "MSFT") {
             //    abort;
@@ -111,7 +111,7 @@ service<http> StockquoteService2 {
         log:printInfo("Received update stockquote request2");
         http:OutResponse res;
         transaction {
-            json updateReq = req.getJsonPayload();
+            var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
                                     [updateReq.symbol, updateReq.price]);
             log:printInfo(msg);

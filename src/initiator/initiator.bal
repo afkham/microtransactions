@@ -92,7 +92,7 @@ public connector BizClient (string url) {
             if (res.statusCode != 200) {
                 err = {message:"Error occurred"};
             } else {
-                jsonRes = res.getJsonPayload();
+                jsonRes, _ = res.getJsonPayload();
             }
         } else {
             err = (error)e;
