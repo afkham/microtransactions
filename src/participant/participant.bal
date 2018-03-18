@@ -2,19 +2,26 @@ import ballerina.log;
 import ballerina.io;
 import ballerina.net.http;
 
-@http:configuration {
-    basePath:"/stockquote",
+endpoint http:ServiceEndpoint participantEP {
     host:"localhost",
     port:8889
+};
+
+endpoint http:ClientEndpoint participant2EP {
+    targets:[{uri:"http://localhost:8890/p2"}]
+};
+
+@http:serviceConfig {
+    basePath:"/stockquote"
 }
-service<http> StockquoteService {
+service<http:Service> StockquoteService bind participantEP {
 
     @http:resourceConfig {
         path:"/update"
     }
-    resource updateStockQuote (http:Connection conn, http:InRequest req) {
+    updateStockQuote (endpoint conn, http:Request req) {
         log:printInfo("Received update stockquote request");
-        http:OutResponse res;
+        http:Response res;
         transaction {
             io:println("1st transaction block");
         }
@@ -28,7 +35,7 @@ service<http> StockquoteService {
             json jsonRes = {"message":"updating stock"};
             res = {statusCode:200};
             res.setJsonPayload(jsonRes);
-            var err = conn.respond(res);
+            var err = conn -> respond(res);
             if (err != null) {
                 log:printErrorCause("Could not send response back to initiator", err);
             } else {
@@ -40,9 +47,9 @@ service<http> StockquoteService {
     @http:resourceConfig {
         path:"/update2"
     }
-    resource updateStockQuote2 (http:Connection conn, http:InRequest req) {
+    updateStockQuote2 (endpoint conn, http:Request req) {
         log:printInfo("Received update stockquote request2");
-        http:OutResponse res;
+        http:Response res;
         transaction {
             var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
@@ -52,29 +59,28 @@ service<http> StockquoteService {
             json jsonRes = {"message":"updating stock"};
             res = {statusCode:200};
             res.setJsonPayload(jsonRes);
-            var err = conn.respond(res);
+            var err = conn -> respond(res);
             if (err != null) {
                 log:printErrorCause("Could not send response back to initiator", err);
             } else {
                 log:printInfo("Sent response back to initiator");
             }
+            //abort;
         }
     }
 }
 
-@http:configuration {
-    basePath:"/stockquote2",
-    host:"localhost",
-    port:8889
+@http:serviceConfig {
+    basePath:"/stockquote2"
 }
-service<http> StockquoteService2 {
+service<http:Service> StockquoteService2 bind participantEP {
 
     @http:resourceConfig {
         path:"/update"
     }
-    resource updateStockQuote (http:Connection conn, http:InRequest req) {
+    updateStockQuote (endpoint conn, http:Request req) {
         log:printInfo("Received update stockquote request");
-        http:OutResponse res;
+        http:Response res;
         transaction {
             io:println("1st transaction block");
         }
@@ -92,7 +98,7 @@ service<http> StockquoteService2 {
             json jsonRes = {"message":"updating stock"};
             res = {statusCode:200};
             res.setJsonPayload(jsonRes);
-            var err = conn.respond(res);
+            var err = conn -> respond(res);
             if (err != null) {
                 log:printErrorCause("Could not send response back to initiator", err);
             } else {
@@ -104,12 +110,9 @@ service<http> StockquoteService2 {
     @http:resourceConfig {
         path:"/update2"
     }
-    resource updateStockQuote2 (http:Connection conn, http:InRequest req) {
-        endpoint<http:HttpClient> participant2EP {
-            create http:HttpClient("http://localhost:8890/p2", {});
-        }
+    updateStockQuote2 (endpoint conn, http:Request req) {
         log:printInfo("Received update stockquote request2");
-        http:OutResponse res;
+        http:Response res;
         transaction {
             var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
@@ -118,7 +121,7 @@ service<http> StockquoteService2 {
 
 
             string pathSeqment = io:sprintf("/update/%j/%j", [updateReq.symbol, updateReq.price]);
-            var inRes, e = participant2EP.get(pathSeqment, {});
+            var inRes, e = participant2EP -> get(pathSeqment, {});
             json jsonRes;
             if(e == null) {
                 res = {statusCode:200};
@@ -129,11 +132,15 @@ service<http> StockquoteService2 {
             }
 
             res.setJsonPayload(jsonRes);
-            var err = conn.respond(res);
+            var err = conn -> respond(res);
             if (err != null) {
                 log:printErrorCause("Could not send response back to initiator", err);
             } else {
                 log:printInfo("Sent response back to initiator");
+            }
+            if(res.statusCode == 500) {
+                io:println("###### Call to participant2 unsuccessful Aborting");
+                abort;
             }
         }
     }

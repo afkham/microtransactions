@@ -14,9 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import ballerina.net.http;
 import ballerina.data.sql;
 import ballerina.io;
+import ballerina.net.http;
 
 @http:configuration {
     basePath:"/p2",
@@ -24,23 +24,24 @@ import ballerina.io;
     port:8890
 }
 service<http> Participant2 {
+    sql:ClientConnector sqlConn = create sql:ClientConnector(
+                                  sql:DB.MYSQL, "localhost", 3306, "testdb", "root", "root", {maximumPoolSize:5});
 
     @http:resourceConfig {
         path:"/update/{symbol}/{price}"
     }
-    resource update (http:Connection conn, http:InRequest req, string symbol, string price) {
+    resource update (endpoint conn, http:InRequest req, string symbol, string price) {
         endpoint<sql:ClientConnector> testDB {
-            create sql:ClientConnector(
-            sql:DB.MYSQL, "localhost", 3306, "testdb", "root", "root", {maximumPoolSize:5});
+            sqlConn;
         }
 
-        var intPrice, _ = <int> price;
-        int updatedRows =
-        testDB.update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", null);
+        var intPrice, _ = <int>price;
 
         boolean transactionSuccess = false;
         transaction with retries(4) {
-            int c = testDB.update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES ('" + symbol + "', "+ price + ")", null);
+            int updatedRows = testDB.
+                                    update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", null);
+            int c = testDB.update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES ('" + symbol + "', " + price + ")", null);
             io:println("Inserted count:" + c);
 
             if (c == 0) {
@@ -55,7 +56,6 @@ service<http> Participant2 {
             io:println("Transaction committed");
         }
 
-        testDB.close();
         http:OutResponse res = {statusCode:200};
         _ = conn.respond(res);
     }
