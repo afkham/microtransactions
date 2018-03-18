@@ -18,19 +18,22 @@ import ballerina.data.sql;
 import ballerina.io;
 import ballerina.net.http;
 
-@http:configuration {
-    basePath:"/p2",
+endpoint http:ServiceEndpoint participantEP {
     host:"localhost",
     port:8890
+};
+
+@http:serviceConfig {
+    basePath:"/p2",
 }
-service<http> Participant2 {
+service<http:Service> Participant2 bind participantEP {
     sql:ClientConnector sqlConn = create sql:ClientConnector(
                                   sql:DB.MYSQL, "localhost", 3306, "testdb", "root", "root", {maximumPoolSize:5});
 
     @http:resourceConfig {
         path:"/update/{symbol}/{price}"
     }
-    resource update (endpoint conn, http:InRequest req, string symbol, string price) {
+    update (endpoint conn, http:InRequest req, string symbol, string price) {
         endpoint<sql:ClientConnector> testDB {
             sqlConn;
         }
@@ -39,7 +42,7 @@ service<http> Participant2 {
 
         boolean transactionSuccess = false;
         transaction with retries(4) {
-            int updatedRows = testDB.
+            int updatedRows = testDB ->
                                     update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", null);
             int c = testDB.update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES ('" + symbol + "', " + price + ")", null);
             io:println("Inserted count:" + c);
@@ -57,6 +60,6 @@ service<http> Participant2 {
         }
 
         http:OutResponse res = {statusCode:200};
-        _ = conn.respond(res);
+        _ = conn -> respond(res);
     }
 }

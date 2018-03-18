@@ -7,10 +7,6 @@ endpoint http:ServiceEndpoint participantEP {
     port:8889
 };
 
-endpoint http:ClientEndpoint participant2EP {
-    targets:[{uri:"http://localhost:8890/p2"}]
-};
-
 @http:serviceConfig {
     basePath:"/stockquote"
 }
@@ -111,6 +107,9 @@ service<http:Service> StockquoteService2 bind participantEP {
         path:"/update2"
     }
     updateStockQuote2 (endpoint conn, http:Request req) {
+        endpoint http:ClientEndpoint participant2EP {
+            targets:[{uri:"http://localhost:8890/p2"}]
+        };
         log:printInfo("Received update stockquote request2");
         http:Response res;
         transaction {
