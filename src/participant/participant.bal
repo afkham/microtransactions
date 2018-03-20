@@ -7,12 +7,12 @@ endpoint http:ServiceEndpoint participantEP {
     port:8889
 };
 
-@http:serviceConfig {
+@http:ServiceConfig {
     basePath:"/stockquote"
 }
 service<http:Service> StockquoteService bind participantEP {
 
-    @http:resourceConfig {
+    @http:ResourceConfig {
         path:"/update"
     }
     updateStockQuote (endpoint conn, http:Request req) {
@@ -66,12 +66,12 @@ service<http:Service> StockquoteService bind participantEP {
     }
 }
 
-@http:serviceConfig {
+@http:ServiceConfig {
     basePath:"/stockquote2"
 }
 service<http:Service> StockquoteService2 bind participantEP {
 
-    @http:resourceConfig {
+    @http:ResourceConfig {
         path:"/update"
     }
     updateStockQuote (endpoint conn, http:Request req) {
@@ -103,7 +103,7 @@ service<http:Service> StockquoteService2 bind participantEP {
         }
     }
 
-    @http:resourceConfig {
+    @http:ResourceConfig {
         path:"/update2"
     }
     updateStockQuote2 (endpoint conn, http:Request req) {

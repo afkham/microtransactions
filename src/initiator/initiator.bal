@@ -11,12 +11,12 @@ endpoint http:ServiceEndpoint initiatorEP {
 string host = "127.0.0.1";
 int port = 8889;
 
-@http:serviceConfig {
+@http:ServiceConfig {
     basePath:"/"
 }
 service<http:Service> InitiatorService bind initiatorEP {
 
-    @http:resourceConfig {
+    @http:ResourceConfig {
         methods:["GET"],
         path:"/"
     }

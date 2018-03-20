@@ -23,14 +23,14 @@ endpoint http:ServiceEndpoint participantEP {
     port:8890
 };
 
-@http:serviceConfig {
+@http:ServiceConfig {
     basePath:"/p2",
 }
 service<http:Service> Participant2 bind participantEP {
     sql:ClientConnector sqlConn = create sql:ClientConnector(
                                   sql:DB.MYSQL, "localhost", 3306, "testdb", "root", "root", {maximumPoolSize:5});
 
-    @http:resourceConfig {
+    @http:ResourceConfig {
         path:"/update/{symbol}/{price}"
     }
     update (endpoint conn, http:InRequest req, string symbol, string price) {
