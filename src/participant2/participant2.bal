@@ -24,34 +24,41 @@ endpoint http:ServiceEndpoint participantEP {
 };
 
 @http:ServiceConfig {
-    basePath:"/p2",
+    basePath:"/p2"
 }
 service<http:Service> Participant2 bind participantEP {
-    sql:ClientConnector sqlConn = create sql:ClientConnector(
-                                  sql:DB.MYSQL, "localhost", 3306, "testdb", "root", "root", {maximumPoolSize:5});
 
     @http:ResourceConfig {
         path:"/update/{symbol}/{price}"
     }
-    update (endpoint conn, http:InRequest req, string symbol, string price) {
-        endpoint<sql:ClientConnector> testDB {
-            sqlConn;
-        }
-
-        var intPrice, _ = <int>price;
+    update (endpoint conn, http:Request req, string symbol, string price) {
+        endpoint sql:Client testDB {
+            database: sql:DB.MYSQL,
+            host: "localhost",
+            port: 3306,
+            name: "testdb",
+            username: "root",
+            password: "root",
+            options: {maximumPoolSize:5}
+        };
+        var intPrice, _ = <float>price;
 
         boolean transactionSuccess = false;
         transaction with retries(4) {
-            int updatedRows = testDB ->
-                                    update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", null);
-            int c = testDB.update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES ('" + symbol + "', " + price + ")", null);
+            int updatedRows = testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", null);
+
+            sql:Parameter[] params = [];
+            sql:Parameter para1 = {sqlType:sql:Type.VARCHAR, value:symbol};
+            sql:Parameter para2 = {sqlType:sql:Type.FLOAT, value:price};
+            params = [para1, para2];
+            int c = testDB -> update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES (?,?)", params);
             io:println("Inserted count:" + c);
 
             if (c == 0) {
                 abort;
             }
             transactionSuccess = true;
-        } failed {
+        } onretry {
             io:println("Transaction failed");
             transactionSuccess = false;
         }
@@ -59,7 +66,7 @@ service<http:Service> Participant2 bind participantEP {
             io:println("Transaction committed");
         }
 
-        http:OutResponse res = {statusCode:200};
+        http:Response res = {statusCode:200};
         _ = conn -> respond(res);
     }
 }

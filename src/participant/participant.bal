@@ -40,7 +40,7 @@ service<http:Service> StockquoteService bind participantEP {
         }
     }
 
-    @http:resourceConfig {
+    @http:ResourceConfig {
         path:"/update2"
     }
     updateStockQuote2 (endpoint conn, http:Request req) {

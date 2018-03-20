@@ -31,7 +31,7 @@ service<http:Service> InitiatorService bind initiatorEP {
             //    res = {statusCode:500};
             //    abort;
             //} else {
-                boolean successful = callBusinessService("/stockquote/update2", "GOOG");
+                boolean successful = callBusinessService("/stockquote2/update2", "GOOG");
                 if (!successful) {
                     log:printInfo("Business service call failed");
                     res = {statusCode:500};
