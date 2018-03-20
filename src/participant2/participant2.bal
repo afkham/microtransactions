@@ -36,7 +36,7 @@ service<http:Service> Participant2 bind participantEP {
             database: sql:DB.MYSQL,
             host: "localhost",
             port: 3306,
-            name: "testdb",
+            name: "testdb?useSSL=false",
             username: "root",
             password: "root",
             options: {maximumPoolSize:5}

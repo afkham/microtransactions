@@ -55,9 +55,11 @@ service<http:Service> InitiatorService bind initiatorEP {
                     //}
                 //}
             //}
-            transaction {
-                log:printInfo("Nested participant transaction");
-                //abort;
+        log:printInfo("$$$$$$$ Before Nested participant transaction");
+
+        transaction {
+                log:printInfo("############## Nested participant transaction");
+                abort;
             }
         }
         //transaction {
