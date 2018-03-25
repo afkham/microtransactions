@@ -1,11 +1,16 @@
-import ballerina.log;
-import ballerina.io;
-import ballerina.net.http;
+import ballerina/io;
+import ballerina/log;
+import ballerina/net.http;
 
 endpoint http:ServiceEndpoint participantEP {
     host:"localhost",
     port:8889
 };
+
+struct StockQuoteUpdateRequest {
+    string symbol;
+    float price;
+}
 
 @http:ServiceConfig {
     basePath:"/stockquote"
@@ -13,55 +18,51 @@ endpoint http:ServiceEndpoint participantEP {
 service<http:Service> StockquoteService bind participantEP {
 
     @http:ResourceConfig {
-        path:"/update"
+        path:"/update",
+        body: "stockQuoteUpdate"
     }
-    updateStockQuote (endpoint conn, http:Request req) {
+    updateStockQuote (endpoint conn,http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         log:printInfo("Received update stockquote request");
-        http:Response res;
+        http:Response res = {};
         transaction {
             io:println("1st transaction block");
         }
         transaction {
             io:println("2nd transaction block");
-            var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [updateReq.symbol, updateReq.price]);
+                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
             log:printInfo(msg);
 
             json jsonRes = {"message":"updating stock"};
-            res = {statusCode:200};
+            res.statusCode = 200;
             res.setJsonPayload(jsonRes);
-            var err = conn -> respond(res);
-            if (err != null) {
-                log:printErrorCause("Could not send response back to initiator", err);
-            } else {
-                log:printInfo("Sent response back to initiator");
-            }
+        }
+        var result = conn -> respond(res);
+        match result {
+            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
         }
     }
 
     @http:ResourceConfig {
-        path:"/update2"
+        path:"/update2",
+        body: "stockQuoteUpdate"
     }
-    updateStockQuote2 (endpoint conn, http:Request req) {
+    updateStockQuote2 (endpoint conn,http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         log:printInfo("Received update stockquote request2");
-        http:Response res;
+        http:Response res = {};
         transaction {
-            var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [updateReq.symbol, updateReq.price]);
+                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
             log:printInfo(msg);
 
             json jsonRes = {"message":"updating stock"};
-            res = {statusCode:200};
+            res.statusCode = 200;
             res.setJsonPayload(jsonRes);
-            var err = conn -> respond(res);
-            if (err != null) {
-                log:printErrorCause("Could not send response back to initiator", err);
-            } else {
-                log:printInfo("Sent response back to initiator");
-            }
             //abort;
+        }
+        var result = conn -> respond(res);
+        match result {
+            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
         }
     }
 }
@@ -72,75 +73,71 @@ service<http:Service> StockquoteService bind participantEP {
 service<http:Service> StockquoteService2 bind participantEP {
 
     @http:ResourceConfig {
-        path:"/update"
+        path:"/update",
+        body: "stockQuoteUpdate"
     }
-    updateStockQuote (endpoint conn, http:Request req) {
+    updateStockQuote (endpoint conn, http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         log:printInfo("Received update stockquote request");
-        http:Response res;
+        http:Response res = {};
         transaction {
             io:println("1st transaction block");
         }
         transaction {
             io:println("2nd transaction block");
-            var updateReq, _ = req.getJsonPayload();
-            var symbol, _ = (string)updateReq.symbol;
             //if (symbol == "MSFT") {
             //    abort;
             //}
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [symbol, updateReq.price]);
+                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
             log:printInfo(msg);
 
             json jsonRes = {"message":"updating stock"};
-            res = {statusCode:200};
+            res.statusCode = 200;
             res.setJsonPayload(jsonRes);
-            var err = conn -> respond(res);
-            if (err != null) {
-                log:printErrorCause("Could not send response back to initiator", err);
-            } else {
-                log:printInfo("Sent response back to initiator");
-            }
+        }
+        var result = conn -> respond(res);
+        match result {
+            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
         }
     }
 
     @http:ResourceConfig {
-        path:"/update2"
+        path:"/update2",
+        body: "stockQuoteUpdate"
     }
-    updateStockQuote2 (endpoint conn, http:Request req) {
+    updateStockQuote2 (endpoint conn, http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         endpoint http:ClientEndpoint participant2EP {
             targets:[{uri:"http://localhost:8890/p2"}]
         };
         log:printInfo("Received update stockquote request2");
-        http:Response res;
+        http:Response res = {};
         transaction {
-            var updateReq, _ = req.getJsonPayload();
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [updateReq.symbol, updateReq.price]);
+                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
             log:printInfo(msg);
 
-
-            string pathSeqment = io:sprintf("/update/%j/%j", [updateReq.symbol, updateReq.price]);
-            var inRes, e = participant2EP -> get(pathSeqment, {});
+            string pathSeqment = io:sprintf("/update/%j/%j", [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
+            var result = participant2EP -> get(pathSeqment, {});
             json jsonRes;
-            if(e == null) {
-                res = {statusCode:200};
-                jsonRes = {"message":"updated stock"};
-            } else {
-                res = {statusCode:500};
-                jsonRes = {"message":"update failed"};
+            match result {
+                http:Response => {
+                    res.statusCode = 200;
+                    jsonRes = {"message":"updated stock"};
+                }
+                http:HttpConnectorError err => {
+                    res.statusCode = 500;
+                    jsonRes = {"message":"update failed"};
+                }
             }
-
             res.setJsonPayload(jsonRes);
-            var err = conn -> respond(res);
-            if (err != null) {
-                log:printErrorCause("Could not send response back to initiator", err);
-            } else {
-                log:printInfo("Sent response back to initiator");
-            }
-            if(res.statusCode == 500) {
+            if (res.statusCode == 500) {
                 io:println("###### Call to participant2 unsuccessful Aborting");
                 abort;
             }
+        }
+        var result = conn -> respond(res);
+        match result {
+            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
         }
     }
 }

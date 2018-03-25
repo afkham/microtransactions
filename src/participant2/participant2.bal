@@ -14,13 +14,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import ballerina.data.sql;
-import ballerina.io;
-import ballerina.net.http;
+import ballerina/data.sql;
+import ballerina/io;
+import ballerina/log;
+import ballerina/net.http;
 
 endpoint http:ServiceEndpoint participantEP {
     host:"localhost",
     port:8890
+};
+
+endpoint sql:Client testDB {
+    database:sql:DB.MYSQL,
+    host:"localhost",
+    port:3306,
+    name:"testdb?useSSL=false",
+    username:"root",
+    password:"root",
+    options:{maximumPoolSize:5}
 };
 
 @http:ServiceConfig {
@@ -31,30 +42,21 @@ service<http:Service> Participant2 bind participantEP {
     @http:ResourceConfig {
         path:"/update/{symbol}/{price}"
     }
-    update (endpoint conn, http:Request req, string symbol, string price) {
-        endpoint sql:Client testDB {
-            database: sql:DB.MYSQL,
-            host: "localhost",
-            port: 3306,
-            name: "testdb?useSSL=false",
-            username: "root",
-            password: "root",
-            options: {maximumPoolSize:5}
-        };
-        var intPrice, _ = <float>price;
+    update (endpoint conn,http:Request req, string symbol, float price) {
 
         boolean transactionSuccess = false;
-        transaction with retries(4) {
-            int updatedRows = testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", null);
+        transaction with retries = 4 {
+            int updatedRows =? testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)",
+                                                null);
 
             sql:Parameter[] params = [];
             sql:Parameter para1 = {sqlType:sql:Type.VARCHAR, value:symbol};
             sql:Parameter para2 = {sqlType:sql:Type.FLOAT, value:price};
             params = [para1, para2];
-            int c = testDB -> update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES (?,?)", params);
-            io:println("Inserted count:" + c);
+            updatedRows =? testDB -> update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES (?,?)", params);
+            io:println("Inserted count:" + updatedRows);
 
-            if (c == 0) {
+            if (updatedRows == 0) {
                 abort;
             }
             transactionSuccess = true;
@@ -67,6 +69,9 @@ service<http:Service> Participant2 bind participantEP {
         }
 
         http:Response res = {statusCode:200};
-        _ = conn -> respond(res);
+        var result = conn -> respond(res);
+        match result {
+            http:HttpConnectorError err => log:printErrorCause("Could not send response back to participant1", err);
+        }
     }
 }

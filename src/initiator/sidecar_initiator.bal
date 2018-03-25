@@ -8,6 +8,10 @@ endpoint http:ServiceEndpoint initiatorEP {
     port:8081
 };
 
+endpoint BizClientEP ep {
+    url:"http://" + host + ":" + port
+};
+
 string host = "10.100.5.131";
 int port = 8080;
 
@@ -44,9 +48,6 @@ service<http:Service> InitiatorService bind initiatorEP {
 }
 
 function callBusinessService (string pathSegment) returns (boolean successful) {
-    endpoint BizClientEP ep {
-        url:"http://" + host + ":" + port
-    };
     float price = math:randomInRange(200, 250) + math:random();
     var _, e = ep -> call(pathSegment);
     if (e != null) {
@@ -83,6 +84,9 @@ struct BizClient {
 function <BizClient client> call (string pathSegment) returns (json jsonRes, error err) {
     endpoint http:ClientEndpoint httpClient = client.clientEP.httpClient;
     http:Request req = {};
+    json payload = {fullName:"Hotel_Marriot3", checkIn:"Hotel_Marriot_Reserved!",
+                       checkOut:"Hotel_Marriot_Reserved!", rooms:10001};
+    req.setJsonPayload(payload);
     var res, e = httpClient -> get(pathSegment, req);
     log:printInfo("Got response from bizservice");
     if (e == null) {
