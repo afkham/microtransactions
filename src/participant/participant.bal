@@ -13,7 +13,8 @@ struct StockQuoteUpdateRequest {
 }
 
 @http:ServiceConfig {
-    basePath:"/stockquote"
+    basePath:"/stockquote",
+    transactionInfectable: true  
 }
 service<http:Service> StockquoteService bind participantEP {
 
@@ -40,6 +41,7 @@ service<http:Service> StockquoteService bind participantEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            null => return;
         }
     }
 
@@ -63,12 +65,14 @@ service<http:Service> StockquoteService bind participantEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            null => return;
         }
     }
 }
 
 @http:ServiceConfig {
-    basePath:"/stockquote2"
+    basePath:"/stockquote2",
+    transactionInfectable: true
 }
 service<http:Service> StockquoteService2 bind participantEP {
 
@@ -98,8 +102,36 @@ service<http:Service> StockquoteService2 bind participantEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            null => return;
         }
     }
+
+    // @http:ResourceConfig {
+    // path:"/passthru",
+    // body: "stockQuoteUpdate"
+    // }
+    // passthru (endpoint conn, http:Request req) {
+    //     endpoint http:ClientEndpoint ep {
+    //         targets: [{uri: "http://localhost:8890/p2"}]
+    //     };
+    //     http:Request newReq = {};
+    //     var forwardResult = ep -> forward("/task1", req);
+    //     match forwardResult {
+    //         http:HttpConnectorError err => {
+    //             io:print("Participant1 could not send get request to participant2/task1. Error:");
+    //             sendErrorResponseToInitiator(conn);
+    //         }
+    //         http:Response forwardRes => {
+    //             var forwardRes2 = conn -> forward(getRes);
+    //             match forwardRes2 {
+    //                 http:HttpConnectorError err => {
+    //                     io:print("Participant1 could not forward response from participant2 to initiator. Error:");
+    //                     io:println(err);
+    //                 }
+    //                 null => io:print("");
+    //             }
+    //         }
+    // }
 
     @http:ResourceConfig {
         path:"/update2",
@@ -132,12 +164,13 @@ service<http:Service> StockquoteService2 bind participantEP {
             res.setJsonPayload(jsonRes);
             if (res.statusCode == 500) {
                 io:println("###### Call to participant2 unsuccessful Aborting");
-                abort;
+                // abort;
             }
         }
-        var result = conn -> respond(res);
-        match result {
+        var result2 = conn -> respond(res);
+        match result2 {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            null => return;
         }
     }
 }

@@ -45,7 +45,7 @@ service<http:Service> Participant2 bind participantEP {
     update (endpoint conn,http:Request req, string symbol, float price) {
 
         boolean transactionSuccess = false;
-        transaction with retries = 4 {
+        transaction with retries = 4, oncommit = onCommitFn, onabort = onAbortFn {
             int updatedRows =? testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)",
                                                 null);
 
@@ -72,6 +72,15 @@ service<http:Service> Participant2 bind participantEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to participant1", err);
+            null => return;
         }
     }
+}
+
+function onCommitFn() {
+    io:println("##### Committed");
+}
+
+function onAbortFn() {
+    io:println("##### Aborted");
 }

@@ -1,7 +1,7 @@
-import ballerina.io;
-import ballerina.log;
-import ballerina.math;
-import ballerina.net.http;
+import ballerina/log;
+import ballerina/io;
+import ballerina/math;
+import ballerina/net.http;
 
 endpoint http:ServiceEndpoint initiatorEP {
     host:"localhost",
@@ -24,38 +24,44 @@ service<http:Service> InitiatorService bind initiatorEP {
         methods:["GET"],
         path:"/"
     }
-    init (endpoint conn,http:Request req) {
-        http:Response res;
+    init (endpoint conn, http:Request req) {
+        http:Response res = {};
         log:printInfo("Initiating transaction...");
 
-        transaction with retries(4) {
+        //{"fullName":"Hotel_Marriot2", "checkIn":"Hotel_Marriot_Reserved!", "checkOut":"Hotel_Marriot_Reserved!"}
+
+        transaction with retries = 4 {
             log:printInfo("1st initiator transaction");
             boolean successful = callBusinessService("/reservation/hotel");
+
+            io:println("++++++++++ successful=" + successful);
+
             if (!successful) {
-                res = {statusCode:500};
+                res.statusCode = 500;
                 abort;
             } else {
-                res = {statusCode:200};
+                res.statusCode = 200;
             }
         }
-        var err = conn -> respond(res);
-        if (err != null) {
-            log:printErrorCause("Could not send response back to client", err);
-        } else {
-            log:printInfo("Sent response back to client");
+        var result = conn -> respond(res);
+        match result {
+            error err => log:printErrorCause("Could not send response back to client", err);
+            null => log:printInfo("Sent response back to client");
         }
     }
 }
 
-function callBusinessService (string pathSegment) returns (boolean successful) {
+function callBusinessService (string pathSegment) returns boolean { // successful
     float price = math:randomInRange(200, 250) + math:random();
-    var _, e = ep -> call(pathSegment);
-    if (e != null) {
-        successful = false;
-    } else {
-        successful = true;
+    var result = ep -> call(pathSegment);
+    match result {
+        json => return true;
+        error err => {
+            io:println(err);
+            return false;
+        }
+
     }
-    return;
 }
 
 // BizClient connector
@@ -81,22 +87,20 @@ struct BizClient {
     BizClientEP clientEP;
 }
 
-function <BizClient client> call (string pathSegment) returns (json jsonRes, error err) {
+function <BizClient client> call (string pathSegment) returns json|error { //json jsonRes, error err
     endpoint http:ClientEndpoint httpClient = client.clientEP.httpClient;
     http:Request req = {};
-    json payload = {fullName:"Hotel_Marriot3", checkIn:"Hotel_Marriot_Reserved!",
-                       checkOut:"Hotel_Marriot_Reserved!", rooms:10001};
+    json payload = {fullName:"Hotel_Marriot33", checkIn:"Hotel_Marriot_Reserved!",
+                       checkOut:"Hotel_Marriot_Reserved!"};
     req.setJsonPayload(payload);
-    var res, e = httpClient -> get(pathSegment, req);
+    http:Response res =? httpClient -> post(pathSegment, req);
     log:printInfo("Got response from bizservice");
-    if (e == null) {
-        if (res.statusCode != 200) {
-            err = {message:"Error occurred"};
-        } else {
-            jsonRes, _ = res.getJsonPayload();
-        }
+    io:println(res);
+    if (res.statusCode != 200) {
+        error err = {message:"Error occurred"};
+        return err;
     } else {
-        err = (error)e;
+        json jsonRes =? res.getJsonPayload();
+        return jsonRes;
     }
-    return;
 }

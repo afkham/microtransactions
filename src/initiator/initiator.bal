@@ -57,15 +57,17 @@ service<http:Service> InitiatorService bind initiatorEP {
 
             transaction {
                 log:printInfo("############## Nested participant transaction");
-                abort;
+                //abort;
             }
         }
-        //transaction {
-        //    log:printInfo("2nd initiator transaction");
-        //}
+        transaction {
+            log:printInfo("2nd initiator transaction");
+            //abort;
+        }
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to client", err);
+            null => return;
         }
     }
 }
