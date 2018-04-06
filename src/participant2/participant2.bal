@@ -14,18 +14,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import ballerina/data.sql;
+import ballerina/sql;
 import ballerina/io;
 import ballerina/log;
-import ballerina/net.http;
+import ballerina/http;
+//import ballerinax/kebernetes;
 
+//@kubernetes:Service {
+//    name: "participant2"
+//}
 endpoint http:ServiceEndpoint participantEP {
     host:"localhost",
     port:8890
 };
 
 endpoint sql:Client testDB {
-    database:sql:DB.MYSQL,
+    database:sql:DB_MYSQL,
     host:"localhost",
     port:3306,
     name:"testdb?useSSL=false",
@@ -37,42 +41,41 @@ endpoint sql:Client testDB {
 @http:ServiceConfig {
     basePath:"/p2"
 }
-service<http:Service> Participant2 bind participantEP {
+service Participant2 bind participantEP {
 
     @http:ResourceConfig {
         path:"/update/{symbol}/{price}"
     }
     update (endpoint conn,http:Request req, string symbol, float price) {
 
-        boolean transactionSuccess = false;
         transaction with retries = 4, oncommit = onCommitFn, onabort = onAbortFn {
-            int updatedRows =? testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)",
-                                                null);
+            var result = testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", ());
+            int updatedRows = check result;
 
             sql:Parameter[] params = [];
-            sql:Parameter para1 = {sqlType:sql:Type.VARCHAR, value:symbol};
-            sql:Parameter para2 = {sqlType:sql:Type.FLOAT, value:price};
+            sql:Parameter para1 = {sqlType:sql:TYPE_VARCHAR, value:symbol};
+            sql:Parameter para2 = {sqlType:sql:TYPE_FLOAT, value:price};
             params = [para1, para2];
-            updatedRows =? testDB -> update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES (?,?)", params);
+            var result2 = testDB -> update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES (?,?)", params);
+            updatedRows = check result2;
+
             io:println("Inserted count:" + updatedRows);
 
             if (updatedRows == 0) {
                 abort;
             }
-            transactionSuccess = true;
         } onretry {
-            io:println("Transaction failed");
-            transactionSuccess = false;
+            io:println("Retrying transaction...");
         }
-        if (transactionSuccess) {
-            io:println("Transaction committed");
+        transaction {
+            io:println("++++++ 2nd txn");
         }
 
-        http:Response res = {statusCode:200};
+        http:Response res = new; res.statusCode = 200;
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to participant1", err);
-            null => return;
+            () => log:printInfo("");
         }
     }
 }

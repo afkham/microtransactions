@@ -1,7 +1,8 @@
 import ballerina/io;
 import ballerina/log;
 import ballerina/math;
-import ballerina/net.http;
+import ballerina/http;
+import ballerina/runtime;
 
 endpoint http:ServiceEndpoint initiatorEP {
     host:"localhost",
@@ -14,17 +15,17 @@ int port = 8889;
 @http:ServiceConfig {
     basePath:"/"
 }
-service<http:Service> InitiatorService bind initiatorEP {
+service InitiatorService bind initiatorEP {
 
     @http:ResourceConfig {
         methods:["GET"],
         path:"/"
     }
     init (endpoint conn,http:Request req) {
-        http:Response res = {};
+        http:Response res = new;
         log:printInfo("Initiating transaction...");
 
-        transaction {
+       transaction {
             log:printInfo("1st initiator transaction");
             boolean successful = callBusinessService("/stockquote/update", "IBM");
             if (!successful) {
@@ -52,6 +53,8 @@ service<http:Service> InitiatorService bind initiatorEP {
                         }
                     }
                 }
+                io:println("######### sleeping!!!!");
+                //runtime:sleepCurrentWorker(100000);
             }
             log:printInfo("$$$$$$$ Before Nested participant transaction");
 
@@ -67,7 +70,7 @@ service<http:Service> InitiatorService bind initiatorEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to client", err);
-            null => return;
+            () => log:printInfo("");
         }
     }
 }
@@ -87,33 +90,40 @@ function callBusinessService (string pathSegment, string symbol) returns boolean
 
 // BizClient connector
 
-struct BizClientConfig {
-    string url;
-}
+type BizClientConfig {
+string url;
+};
 
-struct BizClientEP {
-    http:ClientEndpoint httpClient;
-}
+type BizClientEP object {
+    private {
+        http:ClientEndpoint httpClient;
+    }
 
-function <BizClientEP ep> init (BizClientConfig conf) {
-    endpoint http:ClientEndpoint httpEP {targets:[{uri:conf.url}]};
-    ep.httpClient = httpEP;
-}
+    function init (BizClientConfig conf) {
+        endpoint http:ClientEndpoint httpEP {targets:[{url:conf.url}]};
+        self.httpClient = httpEP;
+    }
 
-function <BizClientEP ep> getClient () returns (BizClient) {
-    return {clientEP:ep};
-}
+    function getClient () returns (BizClient) {
+        BizClient client = new;
+        client.clientEP = self;
+        return client;
+    }
+};
 
-struct BizClient {
-    BizClientEP clientEP;
-}
+type BizClient object {
+    private {
+        BizClientEP clientEP;
+    }
 
-function <BizClient client> updateStock (string pathSegment, json bizReq) returns json|error {
-    endpoint http:ClientEndpoint httpClient = client.clientEP.httpClient;
-    http:Request req = {};
-    req.setJsonPayload(bizReq);
-    http:Response res =? httpClient -> post(pathSegment, req);
-    log:printInfo("Got response from bizservice");
-    json jsonRes =? res.getJsonPayload();
-    return jsonRes;
-}
+    function updateStock(string pathSegment, json bizReq) returns json|error {
+        endpoint http:ClientEndpoint httpClient = self.clientEP.httpClient;
+        http:Request req = new;
+        req.setJsonPayload(bizReq);
+        var result = httpClient -> post(pathSegment, req);
+        http:Response res = check result;
+        log:printInfo("Got response from bizservice");
+        json jsonRes = check res.getJsonPayload();
+        return jsonRes;
+    }
+};

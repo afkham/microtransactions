@@ -1,22 +1,21 @@
 import ballerina/io;
 import ballerina/log;
-import ballerina/net.http;
+import ballerina/http;
 
 endpoint http:ServiceEndpoint participantEP {
     host:"localhost",
     port:8889
 };
 
-struct StockQuoteUpdateRequest {
+type StockQuoteUpdateRequest {
     string symbol;
     float price;
-}
+};
 
 @http:ServiceConfig {
-    basePath:"/stockquote",
-    transactionInfectable: true  
+    basePath:"/stockquote"
 }
-service<http:Service> StockquoteService bind participantEP {
+service StockquoteService bind participantEP {
 
     @http:ResourceConfig {
         path:"/update",
@@ -24,7 +23,7 @@ service<http:Service> StockquoteService bind participantEP {
     }
     updateStockQuote (endpoint conn,http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         log:printInfo("Received update stockquote request");
-        http:Response res = {};
+        http:Response res = new;
         transaction {
             io:println("1st transaction block");
         }
@@ -41,7 +40,7 @@ service<http:Service> StockquoteService bind participantEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
-            null => return;
+            () => log:printInfo("");
         }
     }
 
@@ -51,7 +50,7 @@ service<http:Service> StockquoteService bind participantEP {
     }
     updateStockQuote2 (endpoint conn,http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         log:printInfo("Received update stockquote request2");
-        http:Response res = {};
+        http:Response res = new;
         transaction {
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
                                     [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
@@ -65,14 +64,13 @@ service<http:Service> StockquoteService bind participantEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
-            null => return;
+            () => log:printInfo("");
         }
     }
 }
 
 @http:ServiceConfig {
-    basePath:"/stockquote2",
-    transactionInfectable: true
+    basePath:"/stockquote2"
 }
 service<http:Service> StockquoteService2 bind participantEP {
 
@@ -82,7 +80,7 @@ service<http:Service> StockquoteService2 bind participantEP {
     }
     updateStockQuote (endpoint conn, http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         log:printInfo("Received update stockquote request");
-        http:Response res = {};
+        http:Response res = new;
         transaction {
             io:println("1st transaction block");
         }
@@ -102,7 +100,7 @@ service<http:Service> StockquoteService2 bind participantEP {
         var result = conn -> respond(res);
         match result {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
-            null => return;
+            () => log:printInfo("");
         }
     }
 
@@ -139,17 +137,17 @@ service<http:Service> StockquoteService2 bind participantEP {
     }
     updateStockQuote2 (endpoint conn, http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
         endpoint http:ClientEndpoint participant2EP {
-            targets:[{uri:"http://localhost:8890/p2"}]
+            targets:[{url:"http://localhost:8890/p2"}]
         };
         log:printInfo("Received update stockquote request2");
-        http:Response res = {};
+        http:Response res = new;
         transaction {
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
                                     [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
             log:printInfo(msg);
 
             string pathSeqment = io:sprintf("/update/%j/%j", [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
-            var result = participant2EP -> get(pathSeqment, {});
+            var result = participant2EP -> get(pathSeqment, new);
             json jsonRes;
             match result {
                 http:Response => {
@@ -164,13 +162,13 @@ service<http:Service> StockquoteService2 bind participantEP {
             res.setJsonPayload(jsonRes);
             if (res.statusCode == 500) {
                 io:println("###### Call to participant2 unsuccessful Aborting");
-                // abort;
+                 abort;
             }
         }
         var result2 = conn -> respond(res);
         match result2 {
             http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
-            null => return;
+            () => log:printInfo("");
         }
     }
 }
