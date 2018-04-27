@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import ballerina/mysql;
 import ballerina/sql;
 import ballerina/io;
 import ballerina/log;
@@ -23,19 +24,18 @@ import ballerina/http;
 //@kubernetes:Service {
 //    name: "participant2"
 //}
-endpoint http:ServiceEndpoint participantEP {
+endpoint http:Listener participantEP {
     host:"localhost",
     port:8890
 };
 
-endpoint sql:Client testDB {
-    database:sql:DB_MYSQL,
+endpoint mysql:Client testDB {
     host:"localhost",
     port:3306,
-    name:"testdb?useSSL=false",
+    name:"testdb",
     username:"root",
     password:"root",
-    options:{maximumPoolSize:5}
+    poolOptions:{maximumPoolSize:5}
 };
 
 @http:ServiceConfig {
@@ -47,16 +47,15 @@ service Participant2 bind participantEP {
         path:"/update/{symbol}/{price}"
     }
     update (endpoint conn,http:Request req, string symbol, float price) {
+        io:println("##########################");
 
         transaction with retries = 4, oncommit = onCommitFn, onabort = onAbortFn {
-            var result = testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)", ());
+            var result = testDB -> update("CREATE TABLE IF NOT EXISTS STOCK (SYMBOL VARCHAR(30), PRICE FLOAT)");
             int updatedRows = check result;
 
-            sql:Parameter[] params = [];
-            sql:Parameter para1 = {sqlType:sql:TYPE_VARCHAR, value:symbol};
-            sql:Parameter para2 = {sqlType:sql:TYPE_FLOAT, value:price};
-            params = [para1, para2];
-            var result2 = testDB -> update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES (?,?)", params);
+            io:println("##########################");
+
+            var result2 = testDB -> update("INSERT INTO STOCK(SYMBOL,PRICE) VALUES (?,?)", symbol, price);
             updatedRows = check result2;
 
             io:println("Inserted count:" + updatedRows);
@@ -74,16 +73,16 @@ service Participant2 bind participantEP {
         http:Response res = new; res.statusCode = 200;
         var result = conn -> respond(res);
         match result {
-            http:HttpConnectorError err => log:printErrorCause("Could not send response back to participant1", err);
+            error err => log:printError("Could not send response back to participant1", err = err);
             () => log:printInfo("");
         }
     }
 }
 
-function onCommitFn() {
-    io:println("##### Committed");
+function onCommitFn(string transactionId) {
+    io:println("##### Committed: " + transactionId);
 }
 
-function onAbortFn() {
-    io:println("##### Aborted");
+function onAbortFn(string transactionId) {
+    io:println("##### Aborted: " + transactionId);
 }

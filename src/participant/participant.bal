@@ -2,7 +2,7 @@ import ballerina/io;
 import ballerina/log;
 import ballerina/http;
 
-endpoint http:ServiceEndpoint participantEP {
+endpoint http:Listener participantEP {
     host:"localhost",
     port:8889
 };
@@ -30,7 +30,7 @@ service StockquoteService bind participantEP {
         transaction {
             io:println("2nd transaction block");
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
+                                    untaint stockQuoteUpdate.symbol, untaint stockQuoteUpdate.price);
             log:printInfo(msg);
 
             json jsonRes = {"message":"updating stock"};
@@ -39,7 +39,7 @@ service StockquoteService bind participantEP {
         }
         var result = conn -> respond(res);
         match result {
-            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            error err => log:printError("Could not send response back to initiator", err = err);
             () => log:printInfo("");
         }
     }
@@ -53,7 +53,7 @@ service StockquoteService bind participantEP {
         http:Response res = new;
         transaction {
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
+                                    untaint stockQuoteUpdate.symbol, untaint stockQuoteUpdate.price);
             log:printInfo(msg);
 
             json jsonRes = {"message":"updating stock"};
@@ -63,7 +63,7 @@ service StockquoteService bind participantEP {
         }
         var result = conn -> respond(res);
         match result {
-            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            error err => log:printError("Could not send response back to initiator", err = err);
             () => log:printInfo("");
         }
     }
@@ -90,7 +90,7 @@ service<http:Service> StockquoteService2 bind participantEP {
             //    abort;
             //}
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
+                                    untaint stockQuoteUpdate.symbol, untaint stockQuoteUpdate.price);
             log:printInfo(msg);
 
             json jsonRes = {"message":"updating stock"};
@@ -99,7 +99,7 @@ service<http:Service> StockquoteService2 bind participantEP {
         }
         var result = conn -> respond(res);
         match result {
-            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            error err => log:printError("Could not send response back to initiator", err = err);
             () => log:printInfo("");
         }
     }
@@ -109,20 +109,20 @@ service<http:Service> StockquoteService2 bind participantEP {
     // body: "stockQuoteUpdate"
     // }
     // passthru (endpoint conn, http:Request req) {
-    //     endpoint http:ClientEndpoint ep {
+    //     endpoint http:Client ep {
     //         targets: [{uri: "http://localhost:8890/p2"}]
     //     };
     //     http:Request newReq = {};
     //     var forwardResult = ep -> forward("/task1", req);
     //     match forwardResult {
-    //         http:HttpConnectorError err => {
+    //         error err => {
     //             io:print("Participant1 could not send get request to participant2/task1. Error:");
     //             sendErrorResponseToInitiator(conn);
     //         }
     //         http:Response forwardRes => {
     //             var forwardRes2 = conn -> forward(getRes);
     //             match forwardRes2 {
-    //                 http:HttpConnectorError err => {
+    //                 error err => {
     //                     io:print("Participant1 could not forward response from participant2 to initiator. Error:");
     //                     io:println(err);
     //                 }
@@ -136,25 +136,25 @@ service<http:Service> StockquoteService2 bind participantEP {
         body: "stockQuoteUpdate"
     }
     updateStockQuote2 (endpoint conn, http:Request req, StockQuoteUpdateRequest stockQuoteUpdate) {
-        endpoint http:ClientEndpoint participant2EP {
-            targets:[{url:"http://localhost:8890/p2"}]
+        endpoint http:Client participant2EP {
+            url:"http://localhost:8890/p2"
         };
         log:printInfo("Received update stockquote request2");
         http:Response res = new;
         transaction {
             string msg = io:sprintf("Update stock quote request received. symbol:%j, price:%j",
-                                    [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
+                                    untaint stockQuoteUpdate.symbol, untaint stockQuoteUpdate.price);
             log:printInfo(msg);
 
-            string pathSeqment = io:sprintf("/update/%j/%j", [stockQuoteUpdate.symbol, stockQuoteUpdate.price]);
-            var result = participant2EP -> get(pathSeqment, new);
+            string pathSeqment = io:sprintf("/update/%j/%j", untaint stockQuoteUpdate.symbol, untaint stockQuoteUpdate.price);
+            var result = participant2EP -> get(pathSeqment);
             json jsonRes;
             match result {
                 http:Response => {
                     res.statusCode = 200;
                     jsonRes = {"message":"updated stock"};
                 }
-                http:HttpConnectorError err => {
+                error err => {
                     res.statusCode = 500;
                     jsonRes = {"message":"update failed"};
                 }
@@ -167,7 +167,7 @@ service<http:Service> StockquoteService2 bind participantEP {
         }
         var result2 = conn -> respond(res);
         match result2 {
-            http:HttpConnectorError err => log:printErrorCause("Could not send response back to initiator", err);
+            error err => log:printError("Could not send response back to initiator", err = err);
             () => log:printInfo("");
         }
     }

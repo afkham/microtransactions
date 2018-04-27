@@ -4,7 +4,7 @@ import ballerina/math;
 import ballerina/http;
 import ballerina/runtime;
 
-endpoint http:ServiceEndpoint initiatorEP {
+endpoint http:Listener initiatorEP {
     host:"localhost",
     port:8080
 };
@@ -69,7 +69,7 @@ service InitiatorService bind initiatorEP {
         }
         var result = conn -> respond(res);
         match result {
-            http:HttpConnectorError err => log:printErrorCause("Could not send response back to client", err);
+            error err => log:printError("Could not send response back to client", err = err);
             () => log:printInfo("");
         }
     }
@@ -91,20 +91,20 @@ function callBusinessService (string pathSegment, string symbol) returns boolean
 // BizClient connector
 
 type BizClientConfig {
-string url;
+    string url;
 };
 
 type BizClientEP object {
     private {
-        http:ClientEndpoint httpClient;
+        http:Client httpClient;
     }
 
     function init (BizClientConfig conf) {
-        endpoint http:ClientEndpoint httpEP {targets:[{url:conf.url}]};
+        endpoint http:Client httpEP {url:conf.url};
         self.httpClient = httpEP;
     }
 
-    function getClient () returns (BizClient) {
+    function getCallerActions() returns (BizClient) {
         BizClient client = new;
         client.clientEP = self;
         return client;
@@ -117,10 +117,10 @@ type BizClient object {
     }
 
     function updateStock(string pathSegment, json bizReq) returns json|error {
-        endpoint http:ClientEndpoint httpClient = self.clientEP.httpClient;
+        endpoint http:Client httpClient = self.clientEP.httpClient;
         http:Request req = new;
         req.setJsonPayload(bizReq);
-        var result = httpClient -> post(pathSegment, req);
+        var result = httpClient -> post(pathSegment, request = req);
         http:Response res = check result;
         log:printInfo("Got response from bizservice");
         json jsonRes = check res.getJsonPayload();
